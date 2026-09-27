@@ -1,0 +1,190 @@
+#!/usr/bin/env node
+'use strict';
+// gov — evidence-gated workflow for AI coding agents.  Run `gov help`.
+
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+const { Gov, PHASES } = require('../lib/core');
+
+const HELP = `gov — plan → build → review → test → ship, with evidence at every gate
+
+  gov start "<title>"            open a task (phase: plan) and scaffold plan.md
+  gov status [--json]            phase, gate results, and what evidence is missing
+  gov check [phase]              exit 0 only if the gate(s) up to <phase> pass
+  gov advance                    move to the next phase (requires all gates so far)
+  gov back <phase>               return to an earlier phase
+  gov run <build|test> [-- cmd]  execute a command and record the result as evidence
+  gov record <review|verification>
+                                 stamp review.md / verification.md against the current tree
+  gov diff                       changed files (and git diff) since the task started
+  gov approve <plan|ship>        HUMAN ONLY — sign off on the plan or the release
+  gov ship [ref]                 close the task after the ship gate passes (ref: PR URL / SHA)
+  gov abort "<reason>"           close the task without shipping
+  gov log [--verify]             print the evidence ledger, or verify its hash chain
+`;
+
+const ICON = { true: '✔', false: '✘' };
+
+function main(argv) {
+  const [cmd = 'help', ...rest] = argv;
+  if (cmd === 'help' || cmd === '--help' || cmd === '-h') return void process.stdout.write(HELP);
+
+  const gov = Gov.open();
+  if (!gov) throw new Error('No .governance/config.json found in this directory or any parent.');
+
+  switch (cmd) {
+    case 'start': {
+      const title = rest.join(' ').trim();
+      if (!title) throw new Error('Usage: gov start "<title>"');
+      const t = gov.startTask(title);
+      console.log(`Started ${t.id} (phase: plan)`);
+      console.log(`Write the plan: ${gov.rel(path.join(t.dir, 'plan.md'))}`);
+      console.log(`Then ask the human to run: gov approve plan`);
+      return;
+    }
+
+    case 'status':
+      return status(gov, rest.includes('--json'));
+
+    case 'check': {
+      const task = gov.requireTask();
+      const upto = rest[0] || task.phase;
+      if (!PHASES.includes(upto)) throw new Error(`Unknown phase: ${upto}`);
+      const g = gov.gates(task);
+      const missing = PHASES.slice(0, PHASES.indexOf(upto) + 1).flatMap((p) => g[p].missing.map((m) => `[${p}] ${m}`));
+      if (missing.length) {
+        console.log(`✘ gate(s) through ${upto} failing:\n  - ${missing.join('\n  - ')}`);
+        process.exitCode = 1;
+      } else console.log(`✔ gates through ${upto} pass on tree ${g.fingerprint.slice(0, 12)}`);
+      return;
+    }
+
+    case 'advance': {
+      const next = gov.advance();
+      console.log(`→ phase: ${next}`);
+      console.log(NEXT_STEP[next]);
+      return;
+    }
+
+    case 'back':
+      console.log(`← phase: ${gov.back(rest[0])}`);
+      return;
+
+    case 'run': {
+      const kind = rest[0];
+      if (!['build', 'test'].includes(kind)) throw new Error('Usage: gov run <build|test> [-- <command>]');
+      const sep = rest.indexOf('--');
+      const adhoc = sep >= 0 ? rest.slice(sep + 1).join(' ').trim() : null;
+      const results = gov.run(kind, adhoc || null);
+      for (const r of results) console.log(`\n${ICON[r.exitCode === 0]} [${kind}] ${r.cmd} → exit ${r.exitCode} (evidence #${r.seq}, ${r.logFile})`);
+      if (results.some((r) => r.exitCode !== 0)) process.exitCode = 1;
+      return;
+    }
+
+    case 'record': {
+      const kind = rest[0];
+      if (!['review', 'verification'].includes(kind)) throw new Error('Usage: gov record <review|verification>');
+      const r = gov.record(kind);
+      console.log(`${ICON[r.verdict === 'PASS']} ${kind} recorded (verdict ${r.verdict}, evidence #${r.seq}, tree ${r.fingerprint.slice(0, 12)})`);
+      return;
+    }
+
+    case 'diff': {
+      const task = gov.requireTask();
+      const d = gov.changedFiles(task);
+      for (const f of d.added) console.log(`A ${f}`);
+      for (const f of d.modified) console.log(`M ${f}`);
+      for (const f of d.removed) console.log(`D ${f}`);
+      if (!d.all.length) console.log('(no changes since task start)');
+      const base = gov.baseline(task).gitHead;
+      if (base && rest.includes('--patch')) {
+        spawnSync('git', ['--no-pager', 'diff', base, '--', ...d.all.filter((f) => !d.added.includes(f))], { cwd: gov.root, stdio: 'inherit' });
+        for (const f of d.added) console.log(`\n--- new file: ${f}\n${fs.readFileSync(path.join(gov.root, f), 'utf8')}`);
+      }
+      return;
+    }
+
+    case 'approve': {
+      const phase = rest[0];
+      const r = gov.approve(phase);
+      console.log(`✔ ${phase} approved by ${r.actor} (evidence #${r.seq})`);
+      return;
+    }
+
+    case 'ship':
+      gov.ship(rest.join(' ').trim());
+      console.log('✔ shipped. Task closed.');
+      return;
+
+    case 'abort': {
+      const reason = rest.join(' ').trim();
+      if (!reason) throw new Error('Usage: gov abort "<reason>"');
+      gov.abort(reason);
+      console.log('Task aborted and closed.');
+      return;
+    }
+
+    case 'log': {
+      const task = gov.task() || lastTask(gov);
+      if (!task) throw new Error('No tasks yet.');
+      if (rest.includes('--verify')) {
+        const v = gov.verifyLedger(task.id);
+        console.log(v.ok ? '✔ ledger hash chain intact' : `✘ ledger broken at entry ${v.brokenAt}`);
+        if (!v.ok) process.exitCode = 1;
+        return;
+      }
+      for (const e of gov.ledger(task.id)) {
+        const detail = e.type === 'run' ? `${e.kind} \`${e.cmd}\` exit=${e.exitCode}` : e.phase || e.verdict || e.to || e.title || e.reason || e.ref || '';
+        console.log(`#${e.seq} ${e.at} ${e.actor.padEnd(16)} ${e.type.padEnd(12)} ${detail}`);
+      }
+      return;
+    }
+
+    default:
+      throw new Error(`Unknown command: ${cmd}\n\n${HELP}`);
+  }
+}
+
+const NEXT_STEP = {
+  build: 'Implement the approved plan. Then: gov run build',
+  review: 'Spawn the gov-reviewer subagent, save its output to review.md, then: gov record review',
+  test: 'Run: gov run test. Map every AC to evidence in verification.md, then: gov record verification',
+  ship: 'Ask the human to run: gov approve ship. Then commit/push/PR, then: gov ship <ref>',
+};
+
+function status(gov, json) {
+  const task = gov.task();
+  if (!task) {
+    if (json) return console.log(JSON.stringify({ task: null, mode: gov.config.mode }));
+    return console.log(`No active task (mode: ${gov.config.mode}). Start one: gov start "<title>"`);
+  }
+  const g = gov.gates(task);
+  const changed = gov.changedFiles(task).all;
+  if (json) return console.log(JSON.stringify({ task, mode: gov.config.mode, gates: g, changed }, null, 2));
+
+  console.log(`Task   ${task.title}  (${task.id})`);
+  console.log(`Phase  ${task.phase}   mode: ${gov.config.mode}   tree: ${g.fingerprint.slice(0, 12)}   changed files: ${changed.length}`);
+  console.log('');
+  for (const p of PHASES) {
+    const here = p === task.phase ? '◀' : ' ';
+    console.log(`  ${ICON[g[p].ok]} ${p.padEnd(7)} ${here}`);
+    for (const m of g[p].missing) console.log(`      · ${m}`);
+  }
+  const blocking = gov.canLeave(task, g);
+  console.log('');
+  console.log(blocking.length ? `Next: resolve the items above, then \`gov advance\`.` : task.phase === 'ship' ? 'Next: gov ship <ref>' : 'Next: gov advance');
+}
+
+function lastTask(gov) {
+  const dir = path.join(gov.dir, 'runs');
+  const ids = fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [];
+  return ids.length ? gov.task(ids[ids.length - 1]) : null;
+}
+
+try {
+  main(process.argv.slice(2));
+} catch (err) {
+  console.error(`gov: ${err.message}`);
+  process.exitCode = 2;
+}

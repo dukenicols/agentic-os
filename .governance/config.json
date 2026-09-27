@@ -1,0 +1,72 @@
+{
+  "mode": "enforce",
+  "commands": {
+    "build": ["npm run build"],
+    "test": ["npm test"]
+  },
+  "approvals": {
+    "plan": true,
+    "ship": true
+  },
+  "fingerprint": {
+    "ignore": [
+      ".git/",
+      "node_modules/",
+      ".governance/runs/",
+      ".governance/state.json",
+      "dist/",
+      "build/",
+      "coverage/",
+      ".next/",
+      ".DS_Store"
+    ]
+  },
+  "protectedPaths": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    ".claude/agents/gov-reviewer.md",
+    ".governance/config.json",
+    ".governance/state.json",
+    ".governance/bin/",
+    ".governance/lib/",
+    ".governance/hooks/",
+    ".governance/templates/"
+  ],
+  "secretPaths": [
+    ".env",
+    ".env.*",
+    "*.pem",
+    "*.key",
+    "id_rsa*",
+    ".aws/",
+    ".ssh/"
+  ],
+  "secretAllow": [".env.example", ".env.sample", ".env.template"],
+  "guardrails": {
+    "bashDeny": [
+      { "pattern": "\\brm\\s+-[a-zA-Z]*r[a-zA-Z]*f?[a-zA-Z]*\\s+(/|~|\\$HOME|\\*)(\\s|$)", "reason": "Recursive delete of root, home, or wildcard." },
+      { "pattern": "\\bgit\\s+push\\b.*(--force\\b|-f\\b|--force-with-lease)", "reason": "Force-push rewrites shared history." },
+      { "pattern": "\\bgit\\s+reset\\s+--hard\\b", "reason": "Discards work irreversibly. Ask the human." },
+      { "pattern": "\\bgit\\s+clean\\s+-[a-zA-Z]*f", "reason": "Deletes untracked files irreversibly. Ask the human." },
+      { "pattern": "--no-verify\\b", "reason": "Skipping hooks bypasses checks." },
+      { "pattern": "\\bgit\\s+(commit|merge|rebase)\\b.*--no-gpg-sign", "reason": "Do not bypass signing." },
+      { "pattern": "\\b(curl|wget)\\b[^|]*\\|\\s*(sudo\\s+)?(ba|z)?sh\\b", "reason": "Piping remote scripts into a shell." },
+      { "pattern": "\\bsudo\\b", "reason": "Privilege escalation requires a human." },
+      { "pattern": "\\bchmod\\s+-R\\s+777\\b", "reason": "World-writable permissions." },
+      { "pattern": "\\b(DROP|TRUNCATE)\\s+(TABLE|DATABASE|SCHEMA)\\b", "reason": "Destructive SQL. Ask the human." }
+    ],
+    "shipGated": [
+      "\\bgit\\s+push\\b",
+      "\\bgh\\s+pr\\s+(create|merge|ready)\\b",
+      "\\bgh\\s+release\\s+create\\b",
+      "\\b(npm|pnpm|yarn)\\s+publish\\b",
+      "\\bvercel\\b.*--prod\\b",
+      "\\bterraform\\s+apply\\b",
+      "\\bkubectl\\s+(apply|delete|rollout)\\b",
+      "\\bdocker\\s+push\\b"
+    ]
+  },
+  "allowWithoutTask": []
+}
