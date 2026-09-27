@@ -6,6 +6,7 @@ const { Gov, PHASES } = require('../lib/core');
 const { readInput, emit } = require('./io');
 
 function context(gov) {
+  if (gov.configError) return `# Governance: CONFIG ERROR\n${gov.configError}\nEdits and shell commands are blocked until a human fixes it.`;
   const lines = [`# Governance (mode: ${gov.config.mode})`, 'Rules: AGENTS.md. CLI: .governance/bin/gov'];
   const task = gov.task();
   if (!task) {
@@ -23,8 +24,12 @@ function context(gov) {
 module.exports = { context };
 
 if (require.main === module) {
-  const input = readInput();
-  const gov = Gov.open(input.cwd);
-  if (!gov) process.exit(0);
-  emit({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context(gov) } });
+  try {
+    const input = readInput() || {};
+    const gov = Gov.open(input.cwd) || Gov.open(process.env.CLAUDE_PROJECT_DIR);
+    if (!gov) process.exit(0);
+    emit({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context(gov) } });
+  } catch (err) {
+    emit({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: `# Governance: hook error\n${err.message}` } });
+  }
 }

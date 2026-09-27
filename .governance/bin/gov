@@ -32,6 +32,7 @@ function main(argv) {
 
   const gov = Gov.open();
   if (!gov) throw new Error('No .governance/config.json found in this directory or any parent.');
+  if (gov.configError) throw new Error(gov.configError);
 
   switch (cmd) {
     case 'start': {

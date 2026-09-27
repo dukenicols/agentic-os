@@ -93,7 +93,69 @@ Three properties do most of the work:
 
 **Modes** (`.governance/config.json` → `mode`): `enforce` denies; `advisory`
 asks the human instead; `off` disables. Tampering, secrets, and approvals are
-denied in every mode except `off`.
+denied in every mode except `off`. An unknown mode is treated as `enforce`.
+
+**Fail closed.** If `config.json` is invalid JSON or has the wrong shape (for
+example a list that isn't an array of strings, or a regex that doesn't
+compile), nothing falls back to defaults. `gov` refuses to run, and edits and
+shell commands are denied until a human fixes the file; reads stay allowed. If
+the guard itself hits an unexpected error, it denies edits and shell commands
+rather than letting them through. The same goes for hook input it can't parse.
+
+**Release commands are gated everywhere.** A push, PR, publish or deploy only
+runs in the SHIP phase with a passing ship gate. That holds whatever directory
+the command runs in, including other repos. There is deliberately no "other
+repo" exemption. Deciding safely that a command doesn't act on the governed
+repo turned out to require modelling git (worktrees, `.git` files), gh (URLs)
+and the shell exactly, and every attempt failed open somewhere. To release
+another repo from a governed session, the human runs the command, or opens a
+session in that repo.
+
+A built-in detector recognises these whatever flags sit between the program
+and its subcommand (`git -c k=v push`, `kubectl -n prod apply`), and inside
+`bash -c '…'` or `$(…)`:
+
+| Program | Release subcommands |
+|---|---|
+| `git` | `push` |
+| `gh` | `pr create`/`pr new`, `pr merge`, `pr ready`, `release create`/`release new` |
+| `npm`, `pnpm`, `yarn` | `publish` |
+| `terraform` | `apply`, `destroy` |
+| `kubectl` | `apply`, `delete`, `rollout` |
+| `docker` | `push`, and `--push` (as in `docker build --push`) |
+| `vercel` | `--prod`, `--target production`, `promote` |
+
+Program names match case-insensitively, and `--flag=value` counts the same as
+`--flag value`. The `shipGated` regexes in `config.json` are checked on top of
+it. The detector errs strict: an unquoted `git commit -m push` counts as a push.
+
+**Known limits.** These are guardrails, not a sandbox:
+- The tamper check matches paths as text. Writes that spell a protected path
+  differently get through: `.governance//state.json`, an absolute path, a
+  glob, brace expansion, `cd .governance && rm …`, `node -e`, `find -delete`.
+  Use filesystem permissions if you need a hard guarantee.
+- The release detector only knows the programs and subcommands in the table
+  above, plus your `shipGated` patterns. Some things aren't recognised:
+  - other release tools: `cargo publish`, `helm upgrade`, `glab mr create`, `gh api …/merge`, …
+  - git aliases (including your `~/.gitconfig`), shell functions and variables (`$G push`)
+  - escaped or computed words (`gi\t push`, `git "$(echo push)"`)
+  - encoded commands piped to a shell
+
+  Add patterns for tools you use.
+- Release logic inside project scripts (`npm run deploy`, `make release`) is not
+  inspected. Keep release commands where the gate can see them.
+- A push from another clone of the same remote isn't linked to this repo.
+- Path protection compares paths as written. On a case-insensitive filesystem
+  (macOS by default), `.GOVERNANCE/config.json` or `.Env` reach the protected
+  file under a different spelling. This applies to the Edit/Write tools as
+  well as to the shell. *(Planned fix: normalise to the real on-disk path.)*
+- The hook picks the governed root from the command's working directory first.
+  If that directory is inside a *different* governed repo, that repo's rules
+  apply instead. That includes a nested `.governance/config.json` the agent
+  creates itself, which no protected pattern covers. *(Planned fix: also evaluate against the session project and
+  take the stricter verdict.)*
+
+Destructive-command, secret and approval rules apply everywhere.
 
 Everything is configurable in `.governance/config.json`: commands, which
 approvals are required, fingerprint ignores, protected and secret paths,
@@ -104,7 +166,7 @@ blocked shell patterns, and ship-gated commands.
 This framework is built for the failure modes agents actually have: claiming
 success without running anything, reviewing their own work, drifting from the
 plan, "fixing" a test after the review, skipping hooks, pushing too early.
-It makes those paths **impossible or loud**.
+It makes those paths **blocked, or at least visible**. See the known limits above.
 
 It is **not** a sandbox against a deliberately adversarial agent. Shell-level
 checks are pattern-based. A determined process could write the ledger from a

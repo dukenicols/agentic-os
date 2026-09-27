@@ -1,0 +1,257 @@
+$ npm test
+
+> agentic-os-governance@0.1.0 test
+> node --test test/*.test.js
+
+TAP version 13
+# Subtest: matchPath
+ok 1 - matchPath
+  ---
+  duration_ms: 1.457728
+  type: 'test'
+  ...
+# Subtest: validatePlan
+ok 2 - validatePlan
+  ---
+  duration_ms: 1.484543
+  type: 'test'
+  ...
+# Subtest: acceptanceCriteria dedupes and normalises ids
+ok 3 - acceptanceCriteria dedupes and normalises ids
+  ---
+  duration_ms: 0.269227
+  type: 'test'
+  ...
+# Subtest: diffManifests
+ok 4 - diffManifests
+  ---
+  duration_ms: 0.37369
+  type: 'test'
+  ...
+# Subtest: AC1: no cross-repo exemption — releases are gated in any directory
+ok 5 - AC1: no cross-repo exemption — releases are gated in any directory
+  ---
+  duration_ms: 566.644841
+  type: 'test'
+  ...
+# Subtest: AC1: in SHIP with a passing gate, releases are allowed
+ok 6 - AC1: in SHIP with a passing gate, releases are allowed
+  ---
+  duration_ms: 1893.21281
+  type: 'test'
+  ...
+# Subtest: AC2: the built-in release detector sees through flags and indirection
+ok 7 - AC2: the built-in release detector sees through flags and indirection
+  ---
+  duration_ms: 3088.650105
+  type: 'test'
+  ...
+# Subtest: AC3: the tamper check denies every known quote/comment trick
+ok 8 - AC3: the tamper check denies every known quote/comment trick
+  ---
+  duration_ms: 1198.559801
+  type: 'test'
+  ...
+# Subtest: AC4: invalid or wrongly shaped config fails closed everywhere
+ok 9 - AC4: invalid or wrongly shaped config fails closed everywhere
+  ---
+  duration_ms: 5621.446561
+  type: 'test'
+  ...
+# Subtest: AC5: guard errors and unreadable input fail closed
+ok 10 - AC5: guard errors and unreadable input fail closed
+  ---
+  duration_ms: 909.372729
+  type: 'test'
+  ...
+# Subtest: AC6: a cwd outside the governed tree falls back to CLAUDE_PROJECT_DIR
+ok 11 - AC6: a cwd outside the governed tree falls back to CLAUDE_PROJECT_DIR
+  ---
+  duration_ms: 261.739164
+  type: 'test'
+  ...
+# Subtest: AC7: installs always protect the framework code, whatever the source config says
+ok 12 - AC7: installs always protect the framework code, whatever the source config says
+  ---
+  duration_ms: 86.044729
+  type: 'test'
+  ...
+# Subtest: AC8: .idea is ignored and untracked
+ok 13 - AC8: .idea is ignored and untracked
+  ---
+  duration_ms: 24.662198
+  type: 'test'
+  ...
+# Subtest: AC9: stop does not block when only human approvals are missing
+ok 14 - AC9: stop does not block when only human approvals are missing
+  ---
+  duration_ms: 2536.822285
+  type: 'test'
+  ...
+# Subtest: AC10: an unknown mode denies instead of asking
+ok 15 - AC10: an unknown mode denies instead of asking
+  ---
+  duration_ms: 193.236876
+  type: 'test'
+  ...
+# Subtest: edits: blocked with no task, blocked in PLAN, allowed in BUILD, frozen in SHIP
+ok 16 - edits: blocked with no task, blocked in PLAN, allowed in BUILD, frozen in SHIP
+  ---
+  duration_ms: 2688.855581
+  type: 'test'
+  ...
+# Subtest: advisory mode asks instead of denying — but tamper/secrets/approvals stay hard denies
+ok 17 - advisory mode asks instead of denying — but tamper/secrets/approvals stay hard denies
+  ---
+  duration_ms: 403.58133
+  type: 'test'
+  ...
+# Subtest: mode off disables the guard
+ok 18 - mode off disables the guard
+  ---
+  duration_ms: 202.262113
+  type: 'test'
+  ...
+# Subtest: evidence and governance files cannot be written by the agent
+ok 19 - evidence and governance files cannot be written by the agent
+  ---
+  duration_ms: 1412.958899
+  type: 'test'
+  ...
+# Subtest: secrets: no reading or writing
+ok 20 - secrets: no reading or writing
+  ---
+  duration_ms: 824.202047
+  type: 'test'
+  ...
+# Subtest: bash: approvals, tampering, and dangerous commands are blocked
+ok 21 - bash: approvals, tampering, and dangerous commands are blocked
+  ---
+  duration_ms: 1250.380543
+  type: 'test'
+  ...
+# Subtest: bash: ordinary commands and gov invocations pass
+ok 22 - bash: ordinary commands and gov invocations pass
+  ---
+  duration_ms: 888.595573
+  type: 'test'
+  ...
+# Subtest: release commands are gated on SHIP + passing ship gate
+ok 23 - release commands are gated on SHIP + passing ship gate
+  ---
+  duration_ms: 2492.511562
+  type: 'test'
+  ...
+# Subtest: stop hook: blocks un-evidenced phase once, lets approval waits and loops through
+ok 24 - stop hook: blocks un-evidenced phase once, lets approval waits and loops through
+  ---
+  duration_ms: 1271.122999
+  type: 'test'
+  ...
+# Subtest: session start injects live state
+ok 25 - session start injects live state
+  ---
+  duration_ms: 551.369685
+  type: 'test'
+  ...
+# Subtest: installs into a fresh repo, detects npm commands, and is idempotent
+ok 26 - installs into a fresh repo, detects npm commands, and is idempotent
+  ---
+  duration_ms: 188.805434
+  type: 'test'
+  ...
+# Subtest: existing AGENTS.md content is preserved
+ok 27 - existing AGENTS.md content is preserved
+  ---
+  duration_ms: 170.733103
+  type: 'test'
+  ...
+# Subtest: mergeSettings keeps the user’s hooks and permissions
+ok 28 - mergeSettings keeps the user’s hooks and permissions
+  ---
+  duration_ms: 0.569933
+  type: 'test'
+  ...
+# Subtest: happy path: plan → build → review → test → ship
+ok 29 - happy path: plan → build → review → test → ship
+  ---
+  duration_ms: 1985.897056
+  type: 'test'
+  ...
+# Subtest: plan phase cannot be left without a complete, approved plan
+ok 30 - plan phase cannot be left without a complete, approved plan
+  ---
+  duration_ms: 427.726526
+  type: 'test'
+  ...
+# Subtest: editing the plan after approval voids the approval
+ok 31 - editing the plan after approval voids the approval
+  ---
+  duration_ms: 434.433472
+  type: 'test'
+  ...
+# Subtest: the agent cannot approve
+ok 32 - the agent cannot approve
+  ---
+  duration_ms: 316.827834
+  type: 'test'
+  ...
+# Subtest: a failing build is recorded but does not satisfy the gate
+ok 33 - a failing build is recorded but does not satisfy the gate
+  ---
+  duration_ms: 1048.037116
+  type: 'test'
+  ...
+# Subtest: configured commands are authoritative: no substituting `true`
+ok 34 - configured commands are authoritative: no substituting `true`
+  ---
+  duration_ms: 548.006762
+  type: 'test'
+  ...
+# Subtest: changing code after review makes build and review stale
+ok 35 - changing code after review makes build and review stale
+  ---
+  duration_ms: 1125.864137
+  type: 'test'
+  ...
+# Subtest: committing does not invalidate evidence (fingerprint is content-based)
+ok 36 - committing does not invalidate evidence (fingerprint is content-based)
+  ---
+  duration_ms: 827.457502
+  type: 'test'
+  ...
+# Subtest: review must cover every changed file and have no open blockers
+ok 37 - review must cover every changed file and have no open blockers
+  ---
+  duration_ms: 1230.386409
+  type: 'test'
+  ...
+# Subtest: verification must map every AC to PASS with evidence
+ok 38 - verification must map every AC to PASS with evidence
+  ---
+  duration_ms: 1215.91963
+  type: 'test'
+  ...
+# Subtest: tampering with the ledger voids all evidence
+ok 39 - tampering with the ledger voids all evidence
+  ---
+  duration_ms: 673.790859
+  type: 'test'
+  ...
+# Subtest: only one active task; abort closes it
+ok 40 - only one active task; abort closes it
+  ---
+  duration_ms: 540.494179
+  type: 'test'
+  ...
+1..40
+# tests 40
+# suites 0
+# pass 40
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 16492.199634
+
+[exit 0]
