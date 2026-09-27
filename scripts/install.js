@@ -9,6 +9,7 @@ const path = require('path');
 
 const SRC = path.join(__dirname, '..');
 const MARK = '<!-- governance:agents-md -->';
+const FRAMEWORK_PATHS = ['.governance/bin/', '.governance/lib/', '.governance/hooks/'];
 
 function main(argv) {
   const target = path.resolve(argv.find((a) => !a.startsWith('--')) || '.');
@@ -32,6 +33,8 @@ function main(argv) {
   if (!fs.existsSync(cfgPath) || force) {
     const cfg = JSON.parse(fs.readFileSync(path.join(SRC, '.governance', 'config.json'), 'utf8'));
     cfg.mode = mode;
+    // This repo's own config may leave the framework code editable for development; installs never do.
+    cfg.protectedPaths = [...new Set([...(cfg.protectedPaths || []), ...FRAMEWORK_PATHS])];
     cfg.commands = detectCommands(target);
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + '\n');
     log(`✔ .governance/config.json (mode ${mode}; build: ${fmt(cfg.commands.build)}; test: ${fmt(cfg.commands.test)})`);
@@ -124,7 +127,7 @@ const valueOf = (argv, flag) => {
   return i >= 0 ? argv[i + 1] : null;
 };
 
-module.exports = { mergeSettings, detectCommands };
+module.exports = { mergeSettings, detectCommands, FRAMEWORK_PATHS };
 
 if (require.main === module) {
   try {

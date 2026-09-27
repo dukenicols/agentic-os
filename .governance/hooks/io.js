@@ -3,11 +3,13 @@
 
 const fs = require('fs');
 
+/** The hook's JSON input, or null if it can't be read. Callers decide what failing closed means for them. */
 function readInput() {
   try {
-    return JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
+    const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+    return input && typeof input === 'object' && !Array.isArray(input) ? input : null;
   } catch {
-    return {};
+    return null;
   }
 }
 

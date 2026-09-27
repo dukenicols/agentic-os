@@ -29,9 +29,6 @@
     ".claude/agents/gov-reviewer.md",
     ".governance/config.json",
     ".governance/state.json",
-    ".governance/bin/",
-    ".governance/lib/",
-    ".governance/hooks/",
     ".governance/templates/"
   ],
   "secretPaths": [

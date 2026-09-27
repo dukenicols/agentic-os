@@ -8,14 +8,13 @@ const { Gov } = require('../lib/core');
 const { readInput, emit } = require('./io');
 
 function evaluate(input, gov) {
-  if (gov.config.mode === 'off' || input.stop_hook_active) return null;
+  if (gov.configError || gov.config.mode === 'off' || input.stop_hook_active) return null;
   const task = gov.task();
   if (!task) return null;
 
-  const missing = gov.canLeave(task);
-  if (!missing.length) return null;
-  const onlyHumans = missing.every((m) => /human approval/.test(m));
-  if (onlyHumans) return null;
+  const blockers = gov.blockers(task);
+  if (!blockers.length || blockers.every((b) => b.human)) return null; // done, or only waiting on a person
+  const missing = blockers.map((b) => `[${b.phase}] ${b.message}`);
 
   return (
     `[governance] Task "${task.title}" is in ${task.phase.toUpperCase()} and its gate is not evidenced:\n` +
@@ -29,9 +28,14 @@ function evaluate(input, gov) {
 module.exports = { evaluate };
 
 if (require.main === module) {
-  const input = readInput();
-  const gov = Gov.open(input.cwd);
-  if (!gov) process.exit(0);
-  const reason = evaluate(input, gov);
-  if (reason) emit({ decision: 'block', reason });
+  try {
+    const input = readInput();
+    if (!input) process.exit(0); // unreadable input: never trap the session
+    const gov = Gov.open(input.cwd) || Gov.open(process.env.CLAUDE_PROJECT_DIR);
+    if (!gov) process.exit(0);
+    const reason = evaluate(input, gov);
+    if (reason) emit({ decision: 'block', reason });
+  } catch {
+    process.exit(0); // never trap the session on a hook error
+  }
 }

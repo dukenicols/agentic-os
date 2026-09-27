@@ -44,7 +44,27 @@ class Gov {
   constructor(root) {
     this.root = root;
     this.dir = path.join(root, '.governance');
-    this.config = readJSON(path.join(this.dir, 'config.json'), {});
+    // Never fall back to an empty config: that would silently switch every guard off.
+    const oneLine = (s) => String(s).replace(/\s+/g, ' ');
+    let problems = [];
+    let raw;
+    try {
+      raw = JSON.parse(fs.readFileSync(path.join(this.dir, 'config.json'), 'utf8'));
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('not a JSON object');
+    } catch (err) {
+      problems = [oneLine(err.message)];
+    }
+    if (!problems.length) {
+      try {
+        problems = validateConfig(raw);
+      } catch (err) {
+        // A bug in the validator is not the human's config being wrong: say which it is.
+        this.configError = `governance guard error while checking config.json (${oneLine(err.message)}); failing closed.`;
+      }
+    }
+    if (problems.length) this.configError = `.governance/config.json is invalid (${problems.join('; ')}); governance is failing closed.`;
+    this.configError = this.configError || null;
+    this.config = this.configError ? {} : raw;
     this.config.mode = process.env.GOV_MODE || this.config.mode || 'enforce';
   }
 
@@ -314,12 +334,13 @@ class Gov {
     // plan
     {
       const missing = validatePlan(plan);
+      const human = [];
       if (this.config.approvals?.plan) {
         const a = latest((e) => e.type === 'approval' && e.phase === 'plan');
-        if (!a) missing.push('human approval: run `gov approve plan` in your own terminal');
-        else if (a.planHash !== sha256(plan)) missing.push('plan.md changed after approval — re-approve');
+        if (!a) human.push('human approval: run `gov approve plan` in your own terminal');
+        else if (a.planHash !== sha256(plan)) human.push('plan.md changed after approval — human must re-approve');
       }
-      g.plan = gate(missing);
+      g.plan = gate(missing, human);
     }
 
     // build & test commands
@@ -376,12 +397,13 @@ class Gov {
       const missing = PHASES.slice(0, 4)
         .filter((p) => !g[p].ok)
         .map((p) => `${p} gate failing`);
+      const human = [];
       if (this.config.approvals?.ship) {
         const a = latest((e) => e.type === 'approval' && e.phase === 'ship');
-        if (!a) missing.push('human approval: run `gov approve ship` in your own terminal');
-        else if (a.fingerprint !== fp) missing.push('code changed after ship approval — re-approve');
+        if (!a) human.push('human approval: run `gov approve ship` in your own terminal');
+        else if (a.fingerprint !== fp) human.push('code changed after ship approval — human must re-approve');
       }
-      g.ship = gate(missing);
+      g.ship = gate(missing, human);
     }
 
     const integrity = this.verifyLedger(task.id);
@@ -393,8 +415,13 @@ class Gov {
 
   /** Cumulative: to leave a phase, it and every earlier gate must pass on the current tree. */
   canLeave(task, g = this.gates(task)) {
+    return this.blockers(task, g).map((b) => `[${b.phase}] ${b.message}`);
+  }
+
+  /** Everything blocking the current phase, each flagged with whether only a human can resolve it. */
+  blockers(task, g = this.gates(task)) {
     const upto = PHASES.slice(0, PHASES.indexOf(task.phase) + 1);
-    return upto.flatMap((p) => g[p].missing.map((m) => `[${p}] ${m}`));
+    return upto.flatMap((p) => g[p].missing.map((message) => ({ phase: p, message, human: g[p].human.includes(message) })));
   }
 
   advance() {
@@ -514,10 +541,58 @@ function validateVerification(md, acs) {
   return problems;
 }
 
+// ---------------------------------------------------------------------- config
+
+/** Shape checks for config.json. Any problem makes governance fail closed. */
+function validateConfig(c) {
+  const problems = [];
+  const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const strings = (v, name) => {
+    if (v !== undefined && !(Array.isArray(v) && v.every((x) => typeof x === 'string'))) problems.push(`${name} must be an array of strings`);
+  };
+  const regex = (src, name) => {
+    try {
+      new RegExp(src, 'i');
+    } catch {
+      problems.push(`${name} is not a valid regex`);
+    }
+  };
+
+  if (c.mode !== undefined && typeof c.mode !== 'string') problems.push('mode must be a string');
+  for (const k of ['protectedPaths', 'secretPaths', 'secretAllow', 'allowWithoutTask']) strings(c[k], k);
+  if (c.fingerprint !== undefined) {
+    if (!isObj(c.fingerprint)) problems.push('fingerprint must be an object');
+    else strings(c.fingerprint.ignore, 'fingerprint.ignore');
+  }
+  if (c.commands !== undefined) {
+    if (!isObj(c.commands)) problems.push('commands must be an object');
+    else for (const k of ['build', 'test']) strings(c.commands[k], `commands.${k}`);
+  }
+  if (c.approvals !== undefined && !isObj(c.approvals)) problems.push('approvals must be an object');
+  const g = c.guardrails;
+  if (g !== undefined) {
+    if (!isObj(g)) problems.push('guardrails must be an object');
+    else {
+      if (g.bashDeny !== undefined) {
+        if (!Array.isArray(g.bashDeny)) problems.push('guardrails.bashDeny must be an array');
+        else
+          g.bashDeny.forEach((r, i) => {
+            if (!isObj(r) || typeof r.pattern !== 'string') problems.push(`guardrails.bashDeny[${i}].pattern must be a string`);
+            else regex(r.pattern, `guardrails.bashDeny[${i}].pattern`);
+          });
+      }
+      strings(g.shipGated, 'guardrails.shipGated');
+      if (Array.isArray(g.shipGated)) g.shipGated.forEach((s, i) => typeof s === 'string' && regex(s, `guardrails.shipGated[${i}]`));
+    }
+  }
+  return problems;
+}
+
 // --------------------------------------------------------------------- helpers
 
-function gate(missing) {
-  return { ok: missing.length === 0, missing };
+/** A gate result. `human` lists the items only a person can resolve (approvals); they are also in `missing`. */
+function gate(missing, human = []) {
+  return { ok: missing.length + human.length === 0, missing: [...missing, ...human], human };
 }
 
 function fingerprintOf(manifest) {
@@ -571,6 +646,7 @@ module.exports = {
   PHASES,
   findRoot,
   matchPath,
+  validateConfig,
   validatePlan,
   validateReview,
   validateVerification,

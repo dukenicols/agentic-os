@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { FRAMEWORK_PATHS } = require('../scripts/install');
 
 const SRC = path.join(__dirname, '..');
 const GOV = path.join(SRC, '.governance', 'bin', 'gov');
@@ -25,6 +26,8 @@ function sandbox(configPatch = {}) {
   }
   const config = JSON.parse(fs.readFileSync(path.join(SRC, '.governance', 'config.json'), 'utf8'));
   config.commands = { build: ['node check.js'], test: ['node test.js'] };
+  // Sandboxes model an installed repo, where the framework code is always protected.
+  config.protectedPaths = [...new Set([...(config.protectedPaths || []), ...FRAMEWORK_PATHS])];
   Object.assign(config, configPatch);
   fs.writeFileSync(path.join(dir, '.governance', 'config.json'), JSON.stringify(config, null, 2));
 
