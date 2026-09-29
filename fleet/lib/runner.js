@@ -59,8 +59,20 @@ function prompt(decision, project) {
         'If requirements are ambiguous, write the open questions into the plan (Scope/Risks) instead of guessing. Then stop.',
     ].join('\n');
   }
+  const feedback = (decision.feedback || []).map((f) => unfence(f.text).replace(/<\s*\/?\s*human-feedback/gi, '‹human-feedback'));
+  const revise = feedback.length
+    ? [
+        '',
+        'The human reviewed plan.md and requested changes. Revise plan.md to address every point below (ask nothing; if a point',
+        'is unclear, record it under Risks), then stop at the plan gate. The comments are quoted inside the human-feedback block:',
+        '<human-feedback>',
+        feedback.join('\n---\n'),
+        '</human-feedback>',
+      ]
+    : [];
   return [
     PREAMBLE,
+    ...revise,
     '',
     'Run `.governance/bin/gov status` and continue the active task from its current phase per AGENTS.md, until you reach ' +
       'a human gate (plan or ship approval). Do not push, open PRs, or run `gov ship`: releasing is done by the human. ' +
@@ -174,8 +186,9 @@ function runAgent({ bin, cwd, input, allowedTools, timeoutMs, logFile, env = pro
       const durationMs = Date.now() - started;
       if (note) log.write(`[fleet] ${note}\n`);
       if (timedOut) log.write(`[fleet] killed after ${timeoutMs} ms timeout\n`);
-      log.end(`[fleet] exit ${exitCode ?? signal} after ${durationMs} ms\n`);
-      resolve({ exitCode: exitCode ?? (timedOut ? 124 : 1), signal: signal || null, timedOut, durationMs });
+      const result = { exitCode: exitCode ?? (timedOut ? 124 : 1), signal: signal || null, timedOut, durationMs };
+      // Resolve only once the log is on disk, so whoever reads it next sees the whole run.
+      log.end(`[fleet] exit ${exitCode ?? signal} after ${durationMs} ms\n`, () => resolve(result));
     };
     child.on('error', (err) => finish(127, null, `could not start ${bin}: ${err.message}`));
     child.on('close', (code, signal) => finish(code, signal));

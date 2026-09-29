@@ -183,6 +183,44 @@ class Gov {
     return diffManifests(this.baseline(task).manifest, manifest);
   }
 
+  /**
+   * The change since the task started, as a unified diff built from bytes, not by `git diff`. The new side
+   * is read straight from the worktree (the same bytes the fingerprint hashes). The old side comes from the
+   * base commit's objects and is used only if its sha256 matches the manifest recorded at `gov start`.
+   * Repo-local git config, attributes, filters, replace refs and index flags therefore can't change what it
+   * shows. When the old side can't be verified, the whole current file is shown: complete, never partial.
+   */
+  patch(task) {
+    const base = this.baseline(task);
+    const manifest = this.manifest();
+    const d = diffManifests(base.manifest, manifest);
+    return d.all
+      .map((rel) => {
+        const removed = !(rel in manifest);
+        const abs = path.join(this.root, rel);
+        // A symlink is shown as its target, never followed: its target may be outside the repo (or a secret).
+        if (!removed && fs.lstatSync(abs).isSymbolicLink()) {
+          return `diff --gov a/${rel} b/${rel}\nnote: symbolic link to ${JSON.stringify(fs.readlinkSync(abs))}; target content not shown\n`;
+        }
+        const oldBuf = rel in base.manifest ? this.baseBlob(base.gitHead, rel, base.manifest[rel]) : Buffer.alloc(0);
+        const newBuf = removed ? Buffer.alloc(0) : fs.readFileSync(abs);
+        return filePatch(rel, oldBuf, newBuf, { added: !(rel in base.manifest), removed });
+      })
+      .join('');
+  }
+
+  /** A file as it was at task start, from git objects — only if it matches the recorded hash; else null. */
+  baseBlob(gitHead, rel, expectedSha) {
+    if (!gitHead) return null;
+    const r = spawnSync('git', ['--no-replace-objects', 'cat-file', 'blob', `${gitHead}:${rel}`], {
+      cwd: this.root,
+      maxBuffer: 256 * 1024 * 1024,
+      env: { ...process.env, GIT_NO_REPLACE_OBJECTS: '1' },
+    });
+    if (r.status !== 0 || !r.stdout) return null;
+    return sha256(r.stdout) === expectedSha ? r.stdout : null;
+  }
+
   // ------------------------------------------------------------------- ledger
 
   ledgerPath(id) {
@@ -292,23 +330,36 @@ class Gov {
     });
   }
 
-  approve(phase) {
+  /**
+   * Record a human approval. `expect` binds it to what the human reviewed: the plan's sha256 (plan) or
+   * the tree fingerprint (ship). On a mismatch nothing is recorded. `via` names the channel (e.g. fleet-ui).
+   */
+  approve(phase, { expect, via } = {}) {
     if (process.env.CLAUDECODE) {
       throw new Error('Approvals must come from a human. Run `gov approve` in your own terminal, not through the agent.');
     }
     const task = this.requireTask();
     if (!['plan', 'ship'].includes(phase)) throw new Error('Only `plan` and `ship` take approvals.');
+    if (via !== undefined && !/^[a-z0-9-]{1,32}$/.test(via)) throw new Error('--via must match [a-z0-9-]{1,32}');
     const entry = { type: 'approval', phase };
     if (phase === 'plan') {
-      const problems = validatePlan(this.planText(task));
+      const plan = this.planText(task); // read once: what is checked is what is hashed
+      const problems = validatePlan(plan);
       if (problems.length) throw new Error(`Plan is incomplete:\n  - ${problems.join('\n  - ')}`);
-      entry.planHash = sha256(this.planText(task));
+      entry.planHash = sha256(plan);
+      if (expect !== undefined && expect !== entry.planHash) {
+        throw new Error('plan.md changed since it was reviewed (hash mismatch); review it again before approving.');
+      }
     } else {
       const g = this.gates(task);
       const blocking = PHASES.slice(0, 4).filter((p) => !g[p].ok);
       if (blocking.length) throw new Error(`Cannot approve ship: gates failing: ${blocking.join(', ')}`);
       entry.fingerprint = g.fingerprint;
+      if (expect !== undefined && expect !== entry.fingerprint) {
+        throw new Error('the tree changed since it was reviewed (fingerprint mismatch); review it again before approving.');
+      }
     }
+    if (via) entry.via = via;
     return this.append(task.id, entry);
   }
 
@@ -611,6 +662,129 @@ function diffManifests(a, b) {
   return { added, removed, modified, all: [...added, ...modified, ...removed].sort() };
 }
 
+// ------------------------------------------------------------------- patches
+
+const PATCH_CONTEXT = 3;
+const LCS_MAX_CELLS = 4e6;
+
+/** One file's section of `gov diff --patch`. Nothing is ever elided or decoded lossily. */
+function filePatch(rel, oldBuf, newBuf, { added, removed }) {
+  const head = `diff --gov a/${rel} b/${rel}\n`;
+  if (oldBuf === null) {
+    if (removed) return `${head}deleted file; its previous content could not be verified against the baseline\n`;
+    const note = 'note: previous content could not be verified against the baseline: showing the whole current file';
+    const t = decodeBytes(newBuf, !isUtf8(newBuf));
+    return `${head}${note}\n${textNotes([newBuf])}--- a/${rel}\n+++ b/${rel}\n${hunks(lineOps([], toLines(t)))}`;
+  }
+  // Any side that isn't valid UTF-8 switches both sides to the escaped form, so escapes can't collide with text.
+  const escape = !isUtf8(oldBuf) || !isUtf8(newBuf);
+  const ops = lineOps(toLines(decodeBytes(oldBuf, escape)), toLines(decodeBytes(newBuf, escape)));
+  let notes = textNotes([oldBuf, newBuf]);
+  if (!oldBuf.equals(newBuf) && !ops.some((o) => o[0] !== ' ')) {
+    // Safety net: must never happen with the escaping above, but a change must never look like no change.
+    notes += `note: BYTES DIFFER BUT NOT AS TEXT (sha256 ${sha256(oldBuf).slice(0, 12)} → ${sha256(newBuf).slice(0, 12)}); review this file on the server\n`;
+  }
+  return `${head}${notes}--- ${added ? '/dev/null' : `a/${rel}`}\n+++ ${removed ? '/dev/null' : `b/${rel}`}\n${hunks(ops)}`;
+}
+
+function isUtf8(buf) {
+  return Buffer.from(buf.toString('utf8'), 'utf8').equals(buf);
+}
+
+/**
+ * Bytes → text without loss. With `escape`, every byte that isn't part of a valid UTF-8 sequence becomes
+ * ⟦0xNN⟧ and a literal ⟦ becomes ⟦⟦, so distinct byte strings always give distinct text.
+ */
+function decodeBytes(buf, escape) {
+  if (!escape) return buf.toString('utf8');
+  let out = '';
+  let i = 0;
+  while (i < buf.length) {
+    const b = buf[i];
+    const len = b < 0x80 ? 1 : b >= 0xc2 && b <= 0xdf ? 2 : b >= 0xe0 && b <= 0xef ? 3 : b >= 0xf0 && b <= 0xf4 ? 4 : 0;
+    const seq = len ? buf.subarray(i, i + len) : null;
+    if (seq && seq.length === len && Buffer.from(seq.toString('utf8'), 'utf8').equals(seq)) {
+      out += seq.toString('utf8').replace(/⟦/g, '⟦⟦');
+      i += len;
+    } else {
+      out += `⟦0x${b.toString(16).toUpperCase().padStart(2, '0')}⟧`;
+      i += 1;
+    }
+  }
+  return out;
+}
+
+function textNotes(bufs) {
+  let n = '';
+  if (bufs.some((b) => b.includes(0))) n += 'note: contains NUL bytes (shown as text)\n';
+  if (bufs.some((b) => !isUtf8(b))) n += 'note: not valid UTF-8 — invalid bytes shown as ⟦0xNN⟧, a literal ⟦ as ⟦⟦\n';
+  return n;
+}
+
+/** Lines of a text; a trailing newline yields a final '' so newline-at-EOF changes stay visible. */
+function toLines(text) {
+  return text === '' ? [] : text.split('\n');
+}
+
+/** Line-level edit script: [' '|'-'|'+', line][]. LCS on the differing middle; whole-block replace if huge. */
+function lineOps(a, b) {
+  let p = 0;
+  while (p < a.length && p < b.length && a[p] === b[p]) p++;
+  let s = 0;
+  while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+  const A = a.slice(p, a.length - s);
+  const B = b.slice(p, b.length - s);
+  const n = A.length;
+  const m = B.length;
+  const mid = [];
+  if (n && m && n * m <= LCS_MAX_CELLS) {
+    const w = m + 1;
+    const L = new Uint32Array((n + 1) * w);
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) L[i * w + j] = A[i] === B[j] ? L[(i + 1) * w + j + 1] + 1 : Math.max(L[(i + 1) * w + j], L[i * w + j + 1]);
+    }
+    let i = 0;
+    let j = 0;
+    while (i < n && j < m) {
+      if (A[i] === B[j]) mid.push([' ', A[i++]]), j++;
+      else if (L[(i + 1) * w + j] >= L[i * w + j + 1]) mid.push(['-', A[i++]]);
+      else mid.push(['+', B[j++]]);
+    }
+    while (i < n) mid.push(['-', A[i++]]);
+    while (j < m) mid.push(['+', B[j++]]);
+  } else {
+    for (const l of A) mid.push(['-', l]);
+    for (const l of B) mid.push(['+', l]);
+  }
+  return [...a.slice(0, p).map((l) => [' ', l]), ...mid, ...a.slice(a.length - s).map((l) => [' ', l])];
+}
+
+/** Unified-diff hunks with PATCH_CONTEXT lines of context around every change. */
+function hunks(ops) {
+  let oldNo = 1;
+  let newNo = 1;
+  const rows = ops.map((o) => {
+    const r = { o, oldNo, newNo };
+    if (o[0] !== '+') oldNo++;
+    if (o[0] !== '-') newNo++;
+    return r;
+  });
+  const changed = rows.flatMap((r, k) => (r.o[0] === ' ' ? [] : [k]));
+  let out = '';
+  for (let k = 0; k < changed.length; k++) {
+    const start = Math.max(0, changed[k] - PATCH_CONTEXT);
+    let end = Math.min(rows.length - 1, changed[k] + PATCH_CONTEXT);
+    while (k + 1 < changed.length && changed[k + 1] - PATCH_CONTEXT <= end + 1) end = Math.min(rows.length - 1, changed[++k] + PATCH_CONTEXT);
+    const slice = rows.slice(start, end + 1);
+    const olds = slice.filter((r) => r.o[0] !== '+');
+    const news = slice.filter((r) => r.o[0] !== '-');
+    const os = olds.length ? olds[0].oldNo : slice[0].oldNo - 1;
+    const ns = news.length ? news[0].newNo : slice[0].newNo - 1;
+    out += `@@ -${os},${olds.length} +${ns},${news.length} @@\n${slice.map((r) => `${r.o[0]}${r.o[1]}\n`).join('')}`;
+  }
+  return out;
+}
+
 function readText(file) {
   try {
     return fs.readFileSync(file, 'utf8');
@@ -654,4 +828,5 @@ module.exports = {
   diffManifests,
   fingerprintOf,
   sha256,
+  _patch: { lineOps, hunks, filePatch, decodeBytes },
 };

@@ -177,12 +177,13 @@ test('AC8: the Asana token never reaches the agent env, logs, events or state', 
   const state = new FleetState(home);
   const callsFile = path.join(fleetHomeDir(), 'calls.jsonl'); // outside FLEET_HOME: it records the agent's env
   const registry = reg([{ name: 'repo', path: dir }], { claudeBin: fakeClaude(home) });
-  const env = { ...process.env, ASANA_TOKEN: SECRET, FAKE_CALLS: callsFile, FAKE_START: '1' };
+  const env = { ...process.env, ASANA_TOKEN: SECRET, FAKE_SECRET: SECRET, FAKE_CALLS: callsFile, FAKE_START: '1' };
   await tick({ registry, state, asana: queueOf([{ gid: 'A1', name: 'x' }]), env });
   const [c] = calls(callsFile);
   assert.ok(c, 'agent ran');
   assert.equal(c.env.ASANA_TOKEN, undefined);
-  assert.ok(!JSON.stringify(c.env).includes(SECRET));
+  assert.equal(c.secretSeen, true, 'the probe reached the agent, so `leaked` is meaningful');
+  assert.equal(c.leaked, false, 'the token value is under no variable name at all');
   assert.ok(!readAll(home).includes(SECRET), 'nothing under FLEET_HOME contains the token');
 });
 
@@ -318,10 +319,12 @@ setInterval(() => {}, 1000);
 `,
   );
   fs.chmodSync(bin, 0o755);
-  const r = await runAgent({ bin, cwd: home, input: '', allowedTools: [], timeoutMs: 500, logFile: path.join(home, 'r.log') });
+  // Generous timeout: under load the agent needs time to start its grandchild before being killed.
+  const r = await runAgent({ bin, cwd: home, input: '', allowedTools: [], timeoutMs: 3000, logFile: path.join(home, 'r.log') });
   assert.equal(r.timedOut, true);
+  assert.ok(fs.existsSync(pidFile), 'the grandchild was started before the timeout');
   const pid = Number(fs.readFileSync(pidFile, 'utf8'));
-  await new Promise((res) => setTimeout(res, 300));
+  for (let i = 0; i < 20 && (() => { try { return process.kill(pid, 0); } catch { return false; } })(); i++) await new Promise((res) => setTimeout(res, 100));
   assert.throws(() => process.kill(pid, 0), /ESRCH/, 'grandchild is gone');
 });
 

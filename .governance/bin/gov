@@ -4,8 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
-const { Gov, PHASES } = require('../lib/core');
+const { Gov, PHASES, sha256 } = require('../lib/core');
 
 const HELP = `gov — plan → build → review → test → ship, with evidence at every gate
 
@@ -18,7 +17,9 @@ const HELP = `gov — plan → build → review → test → ship, with evidence
   gov record <review|verification>
                                  stamp review.md / verification.md against the current tree
   gov diff                       changed files (and git diff) since the task started
-  gov approve <plan|ship>        HUMAN ONLY — sign off on the plan or the release
+  gov approve <plan|ship> [--expect <hash>] [--via <channel>]
+                                 HUMAN ONLY — sign off on the plan or the release; --expect binds it
+                                 to the plan sha256 / tree fingerprint you reviewed
   gov ship [ref]                 close the task after the ship gate passes (ref: PR URL / SHA)
   gov abort "<reason>"           close the task without shipping
   gov log [--verify]             print the evidence ledger, or verify its hash chain
@@ -98,18 +99,15 @@ function main(argv) {
       for (const f of d.modified) console.log(`M ${f}`);
       for (const f of d.removed) console.log(`D ${f}`);
       if (!d.all.length) console.log('(no changes since task start)');
-      const base = gov.baseline(task).gitHead;
-      if (base && rest.includes('--patch')) {
-        spawnSync('git', ['--no-pager', 'diff', base, '--', ...d.all.filter((f) => !d.added.includes(f))], { cwd: gov.root, stdio: 'inherit' });
-        for (const f of d.added) console.log(`\n--- new file: ${f}\n${fs.readFileSync(path.join(gov.root, f), 'utf8')}`);
-      }
+      // Built from verified bytes, not `git diff`: see Gov.patch.
+      if (rest.includes('--patch') && d.all.length) process.stdout.write(`\n${gov.patch(task)}`);
       return;
     }
 
     case 'approve': {
       const phase = rest[0];
-      const r = gov.approve(phase);
-      console.log(`✔ ${phase} approved by ${r.actor} (evidence #${r.seq})`);
+      const r = gov.approve(phase, { expect: option(rest, '--expect'), via: option(rest, '--via') });
+      console.log(`✔ ${phase} approved by ${r.actor}${r.via ? ` via ${r.via}` : ''} (evidence #${r.seq})`);
       return;
     }
 
@@ -162,7 +160,10 @@ function status(gov, json) {
   }
   const g = gov.gates(task);
   const changed = gov.changedFiles(task).all;
-  if (json) return console.log(JSON.stringify({ task, mode: gov.config.mode, gates: g, changed }, null, 2));
+  if (json) {
+    const planHash = sha256(gov.planText(task));
+    return console.log(JSON.stringify({ task, mode: gov.config.mode, gates: g, changed, planHash }, null, 2));
+  }
 
   console.log(`Task   ${task.title}  (${task.id})`);
   console.log(`Phase  ${task.phase}   mode: ${gov.config.mode}   tree: ${g.fingerprint.slice(0, 12)}   changed files: ${changed.length}`);
@@ -175,6 +176,17 @@ function status(gov, json) {
   const blocking = gov.canLeave(task, g);
   console.log('');
   console.log(blocking.length ? `Next: resolve the items above, then \`gov advance\`.` : task.phase === 'ship' ? 'Next: gov ship <ref>' : 'Next: gov advance');
+}
+
+/** Value of `--name <value>`; undefined if absent. A flag given without a value is an error. */
+function option(args, name) {
+  // `--expect=<h>` would otherwise be silently ignored, approving unbound.
+  if (args.some((a) => a.startsWith(`${name}=`))) throw new Error(`use \`${name} <value>\` (with a space), not \`${name}=<value>\``);
+  const i = args.indexOf(name);
+  if (i < 0) return undefined;
+  const v = args[i + 1];
+  if (!v || v.startsWith('--')) throw new Error(`${name} needs a value`);
+  return v;
 }
 
 function lastTask(gov) {

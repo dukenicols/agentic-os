@@ -59,7 +59,31 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
 .tabs button { border: 1px solid var(--line); background: var(--chip); color: var(--ink); border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; }
 .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .close { margin-left: auto; }
-pre { margin: 0; padding: 12px 16px; flex: 1; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--mono); }
+pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--mono); }
+.body { flex: 1; overflow: auto; padding: 12px 16px; }
+.md { max-width: 860px; line-height: 1.55; }
+.md h3 { font-size: 18px; margin: 4px 0 10px; } .md h4 { font-size: 15px; margin: 18px 0 6px; } .md h5 { font-size: 13px; margin: 14px 0 4px; }
+.md p { margin: 6px 0; } .md ul, .md ol { margin: 4px 0; padding-left: 22px; } .md li { margin: 2px 0; }
+.md code { font-family: var(--mono); font-size: 12px; background: var(--chip); padding: 1px 4px; border-radius: 4px; }
+.md pre { background: var(--chip); padding: 8px 10px; border-radius: 6px; margin: 6px 0; }
+.md li.task { list-style: none; margin-left: -18px; }
+.md pre.comment { border-left: 3px solid var(--warn); opacity: .85; }
+pre.raw { font-size: 12.5px; }
+.toggle { display: flex; gap: 4px; margin-top: 8px; }
+.toggle .btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.msg.warn { background: var(--warn-bg); border: 1px solid var(--warn); }
+.diff .note { color: var(--warn); font-weight: 600; } .diff .add { color: var(--ok); } .diff .del { color: var(--bad); } .diff .hunk { color: var(--accent); } .diff .file { font-weight: 600; }
+.approve { max-width: 860px; }
+.approve .doc { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 10px 0; max-height: 45vh; overflow: auto; }
+.approve form { display: grid; gap: 8px; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.approve input, .approve textarea { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+.approve textarea { min-height: 80px; resize: vertical; }
+.approve .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--chip); color: var(--ink); border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit; }
+.btn.primary { background: var(--ok); border-color: var(--ok); color: #fff; } .btn.warn { background: var(--warn); border-color: var(--warn); color: #fff; }
+.btn:disabled { opacity: .5; cursor: default; }
+.msg { font-size: 13px; padding: 6px 10px; border-radius: 6px; } .msg.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); } .msg.err { background: color-mix(in srgb, var(--bad) 15%, transparent); }
+.fb { border-left: 3px solid var(--warn); padding: 4px 10px; margin: 6px 0; white-space: pre-wrap; }
 ul.missing { margin: 4px 0 0 16px; padding: 0; }
 </style>
 </head>
@@ -84,7 +108,7 @@ ul.missing { margin: 4px 0 0 16px; padding: 0; }
 <dialog id="dlg">
   <div class="dlg">
     <div class="tabs" id="tabs"></div>
-    <pre id="body"></pre>
+    <div id="body" class="body"></div>
   </div>
 </dialog>
 
@@ -136,7 +160,9 @@ function render() {
 
   $('inbox').replaceChildren(...(waiting.length ? [el('h2', {}, 'Necesita tu aprobación')] : []),
     ...waiting.map((p) => el('div', {},
+      el('button', { class: 'btn warn', onclick: () => open(p.name, null, 'approve') }, `Revisar ${p.awaiting}`), ' ',
       el('b', {}, p.name), ` — ${p.task.title} `,
+      el('span', { class: 'small' }, ' o en el server: '),
       el('code', {}, `cd ${p.path} && .governance/bin/gov approve ${p.awaiting}`))));
 
   $('grid').replaceChildren(...projects.map((p) => {
@@ -165,6 +191,10 @@ function evLine(e) {
     'skipped-locked': ['', 'omitido: ya hay un agente corriendo'],
     'tick': ['', `ciclo del supervisor (${(e.projects || []).length} proyectos)`],
     'pause': ['bad', `pausado por humano`], 'resume': ['good', 'reanudado por humano'],
+    'approved': ['good', `${e.gate} aprobado desde la UI`],
+    'changes-requested': ['wait', 'cambios pedidos al plan'],
+    'approval-denied': ['bad', `aprobación rechazada: ${e.reason}`],
+    'recovered-interrupted-start': ['', 'recuperado un inicio interrumpido'],
   };
   const [cls, msg] = map[e.type] || ['', e.type];
   return el('div', { class: `ev ${cls}` }, el('time', {}, new Date(e.at).toLocaleString()), ' ',
@@ -204,36 +234,312 @@ function formatLog(raw) {
   }).filter(Boolean).join('\n');
 }
 
+// ---------------------------------------------------------------- markdown → DOM (textContent only, never innerHTML)
+function inline(text) {
+  const out = [];
+  for (const part of String(text).split(/(`[^`]+`|\*\*[^*]+\*\*)/)) {
+    if (!part) continue;
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 1) out.push(el('code', {}, part.slice(1, -1)));
+    else if (part.startsWith('**') && part.endsWith('**') && part.length > 3) out.push(el('strong', {}, part.slice(2, -2)));
+    else out.push(document.createTextNode(part));
+  }
+  return out;
+}
+
+function md(src) {
+  const root = el('div', { class: 'md' });
+  // HTML comments are invisible in rendered markdown but are part of what gets approved: show them, marked.
+  const comments = [];
+  const lines = String(src)
+    .replace(/\u0000/g, '\uFFFD') // only fleet's own comment markers may contain NUL
+    .replace(/<!--[\s\S]*?-->/g, (m) => { comments.push(m); return `\n\u0000C${comments.length - 1}\n`; })
+    .split('\n');
+  const unmark = (t) => t.replace(/\u0000C(\d+)/g, (m, n) => comments[+n]);
+  let list = null;
+  let para = null;
+  const endBlocks = () => { list = null; para = null; };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const cm = line.match(/^\u0000C(\d+)$/);
+    if (cm) {
+      root.append(el('pre', { class: 'comment', title: 'Comentario HTML: invisible en markdown normal, pero es parte de lo que apruebas' }, comments[+cm[1]]));
+      endBlocks();
+      continue;
+    }
+    if (/^\s*```/.test(line)) {
+      // The whole block, fence lines included: text on them is part of the document too.
+      const code = [line];
+      for (i++; i < lines.length && !/^\s*```/.test(lines[i]); i++) code.push(lines[i]);
+      if (i < lines.length) code.push(lines[i]);
+      root.append(el('pre', {}, unmark(code.join('\n'))));
+      endBlocks();
+      continue;
+    }
+    if (/^\s*\|/.test(line)) {
+      const rows = [line];
+      while (i + 1 < lines.length && /^\s*\|/.test(lines[i + 1])) rows.push(lines[++i]);
+      root.append(el('pre', {}, rows.join('\n')));
+      endBlocks();
+      continue;
+    }
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) {
+      root.append(el(`h${Math.min(h[1].length + 2, 6)}`, {}, ...inline(h[2])));
+      endBlocks();
+      continue;
+    }
+    const li = line.match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
+    if (li) {
+      const ordered = /\d/.test(li[2]);
+      if (!list || list.ordered !== ordered) {
+        list = { node: el(ordered ? 'ol' : 'ul'), ordered };
+        root.append(list.node);
+      }
+      para = null;
+      const item = el('li', { style: `margin-left:${Math.min(Math.floor(li[1].length / 2), 6) * 16}px` });
+      const box = li[3].match(/^\[( |x|X)\]\s+(.*)$/);
+      if (box) {
+        const cb = el('input', { type: 'checkbox', disabled: '' });
+        cb.checked = box[1] !== ' ';
+        item.className = 'task';
+        item.append(cb, ' ', ...inline(box[2]));
+      } else item.append(...inline(li[3]));
+      list.node.append(item);
+      continue;
+    }
+    if (!line.trim()) {
+      endBlocks();
+      continue;
+    }
+    if (list && /^\s{2,}\S/.test(line)) {
+      list.node.lastChild.append(' ', ...inline(line.trim()));
+      continue;
+    }
+    list = null;
+    if (!para) {
+      para = el('p');
+      root.append(para);
+    } else para.append(' ');
+    para.append(...inline(line.trim()));
+  }
+  return root;
+}
+
+// Characters that render as nothing, reorder text, or can smuggle hidden text (controls, format
+// characters incl. bidi/zero-width/tag characters, private use, unassigned, lone surrogates, variation
+// selectors, fillers, line/paragraph separators): shown as ⟦U+XXXX⟧. Tab, LF and CR stay as they are.
+const INVISIBLE = /(?![\t\n\r])[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}\p{Zl}\p{Zp}\p{Variation_Selector}\p{Default_Ignorable_Code_Point}\u2800\u034F\u115F\u1160\u3164\uFFA0\u180B-\u180F\u{1D173}-\u{1D17A}]/gu;
+const reveal = (text) => String(text).replace(INVISIBLE, (c) => `⟦U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}⟧`);
+const countInvisible = (text) => (String(text).match(INVISIBLE) || []).length;
+
+/** The document exactly as stored: every character, nothing interpreted. */
+function rawView(text) {
+  return el('pre', { class: 'raw' }, reveal(text));
+}
+
+/** gov's patch format. Lines are classified by position, not by look: content can't pose as a file header. */
+function diffView(raw) {
+  const out = el('pre', { class: 'diff' });
+  let state = 'list'; // list (A/M/D lines) → header (after `diff --gov`) → hunk (after `@@`)
+  for (const line of String(raw).split('\n')) {
+    let cls = '';
+    if (line.startsWith('diff --gov ')) (state = 'header'), (cls = 'file');
+    else if (state === 'list') cls = line ? 'file' : '';
+    else if (state === 'header' && line.startsWith('@@')) (state = 'hunk'), (cls = 'hunk');
+    else if (state === 'header') cls = line.startsWith('note:') ? 'note' : 'file';
+    else if (line.startsWith('@@')) cls = 'hunk';
+    else if (line.startsWith('+')) cls = 'add';
+    else if (line.startsWith('-')) cls = 'del';
+    // CR is revealed here (a CRLF→LF change must not look like an unchanged line)
+    const text = reveal(line).replace(/\r/g, '⟦U+000D⟧');
+    out.append(cls ? el('span', { class: cls }, text) : document.createTextNode(text), '\n');
+  }
+  return out;
+}
+
+const pre = (t) => el('pre', {}, t);
+
+/** A document under approval: exact text by default (every character, invisibles revealed), formatted on request. */
+function docViewer(text) {
+  const doc = el('div', { class: 'doc' });
+  const n = countInvisible(text);
+  const warn = n ? el('div', { class: 'msg warn' }, `Contiene ${n} carácter(es) invisible(s) o de control; en "texto exacto" se muestran como ⟦U+XXXX⟧.`) : null;
+  const views = { exact: () => rawView(text), formatted: () => md(text) };
+  const toggle = el('div', { class: 'toggle' });
+  const pick = (v) => {
+    doc.replaceChildren(views[v]());
+    [...toggle.children].forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+  };
+  toggle.append(
+    el('button', { type: 'button', class: 'btn', 'data-v': 'exact', onclick: () => pick('exact') }, 'Texto exacto'),
+    el('button', { type: 'button', class: 'btn', 'data-v': 'formatted', onclick: () => pick('formatted') }, 'Vista formateada'),
+  );
+  pick('exact');
+  return [warn, toggle, doc].filter(Boolean);
+}
+
+// ---------------------------------------------------------------- approval panel
+async function approvePanel(p) {
+  const info = await getJSON(`/api/projects/${encodeURIComponent(p.name)}/approval`);
+  const box = el('div', { class: 'approve' });
+  if (info.error) {
+    box.append(el('div', { class: 'msg err' }, info.error));
+    return box;
+  }
+  const pend = info.pending;
+  if (!pend) {
+    box.append(el('p', {}, 'Nada espera tu aprobación en este proyecto ahora mismo.'));
+    return box;
+  }
+
+  box.append(el('h3', {}, pend.gate === 'plan' ? `Aprobar plan: ${pend.title}` : `Aprobar ship: ${pend.title}`));
+  if (pend.gate === 'plan') {
+    box.append(el('div', { class: 'small' }, 'Este es el plan exacto que vas a aprobar. Si cambia aunque sea un byte, la aprobación se rechaza.'));
+    const planText = String(info.document || '');
+    const nComments = (planText.match(/<!--/g) || []).length;
+    if (nComments) {
+      box.append(el('div', { class: 'msg warn' }, `El plan tiene ${nComments} comentario(s) HTML: no se ven en markdown normal, pero son parte de lo que apruebas.`));
+    }
+    box.append(...docViewer(planText));
+    box.append(el('div', { class: 'small' }, `sha256 del plan: ${pend.expect.slice(0, 16)}…`));
+  } else {
+    box.append(el('p', {}, 'Build, review y test tienen evidencia sobre este árbol. Abajo está exactamente lo que apruebas: el diff, la revisión y la verificación, leídos juntos con el fingerprint. Aprobar ship no publica nada: el push y el PR siguen siendo tuyos.'));
+    const sh = info.ship || {};
+    box.append(el('h4', {}, 'Diff'));
+    if (sh.diffTooLarge) {
+      box.append(el('div', { class: 'msg err' }, 'El diff es demasiado grande para revisarlo aquí completo. Apruébalo en una terminal del server después de revisarlo.'));
+      return box;
+    }
+    const nDiffInvisible = countInvisible(sh.diff || '');
+    if (nDiffInvisible) box.append(el('div', { class: 'msg warn' }, `El diff contiene ${nDiffInvisible} carácter(es) invisible(s) o de control, mostrados como ⟦U+XXXX⟧.`));
+    box.append(el('div', { class: 'doc' }, diffView(sh.diff || '(sin cambios)')));
+    box.append(el('h4', {}, 'Review'), ...docViewer(sh.review || '(sin review.md)'));
+    box.append(el('h4', {}, 'Verification'), ...docViewer(sh.verification || '(sin verification.md)'));
+    box.append(el('div', { class: 'small' }, `fingerprint del árbol: ${pend.expect.slice(0, 16)}…`));
+  }
+  if (p.feedback && p.feedback.length) {
+    box.append(el('h4', {}, 'Cambios pedidos antes'));
+    for (const f of p.feedback) {
+      const label = { pending: 'pendiente: el agente revisará el plan', addressed: 'atendido: el plan cambió', superseded: 'reemplazado: el plan se aprobó', returned: 'devuelto: el agente no cambió el plan' }[f.status] || f.status;
+      box.append(el('div', { class: 'fb' }, el('div', { class: 'small' }, `${new Date(f.at).toLocaleString()} · ${label}`), f.text));
+    }
+  }
+  if (!info.enabled || !info.supported) {
+    box.append(el('div', { class: 'msg err' }, `No se puede aprobar desde la UI: ${info.reason}`));
+    return box;
+  }
+
+  const msg = el('div', {});
+  const pass = el('input', { type: 'password', autocomplete: 'off', placeholder: 'passphrase', 'aria-label': 'passphrase' });
+  const comment = pend.gate === 'plan' ? el('textarea', { placeholder: 'Qué debe cambiar en el plan (para pedir cambios)', maxlength: '4000' }) : null;
+  const buttons = [];
+  const submit = async (action) => {
+    const body = action === 'approve'
+      ? { gate: pend.gate, expect: pend.expect, passphrase: pass.value }
+      : { text: comment.value, expect: pend.expect, passphrase: pass.value };
+    pass.value = ''; // never kept around, never stored
+    buttons.forEach((b) => (b.disabled = true));
+    msg.replaceChildren(el('div', { class: 'msg' }, 'enviando…'));
+    try {
+      const r = await fetch(`/api/projects/${encodeURIComponent(p.name)}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json().catch(() => ({}));
+      msg.replaceChildren(el('div', { class: `msg ${r.ok ? 'ok' : 'err'}` }, r.ok ? `✔ ${j.message}` : `✘ ${j.error || r.status}`));
+      if (r.ok) {
+        if (comment) comment.value = '';
+        refresh();
+        return;
+      }
+    } catch (e) {
+      msg.replaceChildren(el('div', { class: 'msg err' }, `✘ ${e.message}`));
+    }
+    buttons.forEach((b) => (b.disabled = false));
+  };
+  const approveBtn = el('button', { type: 'button', class: 'btn primary', onclick: () => submit('approve') }, pend.gate === 'plan' ? 'Aprobar plan' : 'Aprobar ship');
+  buttons.push(approveBtn);
+  const actions = el('div', { class: 'actions' }, approveBtn);
+  if (comment) {
+    const fbBtn = el('button', {
+      type: 'button',
+      class: 'btn warn',
+      onclick: () => (comment.value.trim() ? submit('feedback') : msg.replaceChildren(el('div', { class: 'msg err' }, 'Escribe qué debe cambiar.'))),
+    }, 'Pedir cambios');
+    buttons.push(fbBtn);
+    actions.append(fbBtn);
+  }
+  box.append(el('form', { onsubmit: (e) => e.preventDefault() }, pass, comment, actions, msg));
+  return box;
+}
+
+// ---------------------------------------------------------------- detail dialog
 let logTimer;
-function open(name, runId) {
+function open(name, runId, start) {
   const p = projects.find((x) => x.name === name);
   if (!p) return;
-  const tabs = [['estado', () => Promise.resolve(overview(p))]];
-  if (p.task) for (const d of ['plan', 'review', 'verification']) tabs.push([d, () => get(`/api/projects/${encodeURIComponent(name)}/files/${d}`)]);
-  const rid = runId || p.lastRun?.runId;
-  if (rid) tabs.push([runId ? `log ${rid.slice(0, 19)}` : 'último log', () => get(`/api/runs/${encodeURIComponent(name)}/${encodeURIComponent(rid)}/log`).then(formatLog), true]);
+  const q = encodeURIComponent(name);
+  const tabs = [];
+  if (p.awaiting) tabs.push({ id: 'approve', label: `aprobar ${p.awaiting}`, load: () => approvePanel(p) });
+  tabs.push({ id: 'status', label: 'estado', load: async () => pre(overview(p)) });
+  if (p.task) {
+    for (const d of ['plan', 'review', 'verification']) {
+      tabs.push({ id: d, label: d, load: () => fetchDoc(`/api/projects/${q}/files/${d}`) });
+    }
+    if (p.task.phase !== 'plan') tabs.push({ id: 'diff', label: 'diff', load: () => get(`/api/projects/${q}/diff`).then(diffView) });
+  }
+  const rid = runId || (p.lastRun && p.lastRun.runId);
+  if (rid) {
+    tabs.push({ id: 'log', label: runId ? `log ${rid.slice(0, 19)}` : 'último log', load: () => get(`/api/runs/${q}/${encodeURIComponent(rid)}/log`).then((t) => pre(formatLog(t))), live: true });
+  }
   const show = (i) => {
     clearInterval(logTimer);
     [...$('tabs').querySelectorAll('button[data-i]')].forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
-    const [, load, live] = tabs[i];
-    const go = () => load().then((t) => { const body = $('body'); const atEnd = body.scrollTop + body.clientHeight >= body.scrollHeight - 20; body.textContent = t; if (live && atEnd) body.scrollTop = body.scrollHeight; });
-    $('body').textContent = 'cargando…';
+    const { load, live } = tabs[i];
+    const body = $('body');
+    const go = () => load()
+      .then((node) => {
+        const atEnd = body.scrollTop + body.clientHeight >= body.scrollHeight - 20;
+        body.replaceChildren(node);
+        if (live && atEnd) body.scrollTop = body.scrollHeight;
+      })
+      .catch((e) => body.replaceChildren(pre(`(${e.message})`)));
+    body.replaceChildren(pre('cargando…'));
     go();
     if (live) logTimer = setInterval(go, 3000);
   };
   $('tabs').replaceChildren(el('b', { style: 'align-self:center;margin-right:8px' }, name),
-    ...tabs.map(([label], i) => el('button', { 'data-i': i, onclick: () => show(i) }, label)),
+    ...tabs.map((t, i) => el('button', { 'data-i': i, onclick: () => show(i) }, t.label)),
     el('button', { class: 'close', onclick: () => $('dlg').close() }, 'cerrar'));
   $('dlg').showModal();
-  show(runId ? tabs.length - 1 : 0);
+  const want = runId ? 'log' : start || (p.awaiting ? 'approve' : 'status');
+  show(Math.max(0, tabs.findIndex((t) => t.id === want)));
 }
 $('dlg').addEventListener('close', () => clearInterval(logTimer));
 
 async function get(url) {
   const r = await fetch(url);
   const t = await r.text();
-  if (!r.ok) { try { return `(${JSON.parse(t).error})`; } catch { return `(${r.status})`; } }
+  if (!r.ok) {
+    try { return `(${JSON.parse(t).error})`; } catch { return `(${r.status})`; }
+  }
   return t;
+}
+
+async function fetchDoc(url) {
+  const r = await fetch(url);
+  const t = await r.text();
+  if (r.ok) return md(t);
+  let e = r.status;
+  try { e = JSON.parse(t).error; } catch {}
+  return pre(`(${e})`);
+}
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+  return r.ok ? j : { error: j.error || `HTTP ${r.status}` };
 }
 
 function overview(p) {

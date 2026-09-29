@@ -14,6 +14,7 @@ const EMPTY_PROJECT = () => ({
   consecutiveFailures: 0,
   lastRun: null, // { runId, action, exitCode, timedOut, durationMs, at }
   last: null, // snapshot from the latest tick: { action, reason, queue, queueError, at }
+  feedback: [], // change requests from the UI: { at, text, planHash, taskId }
 });
 
 class FleetState {

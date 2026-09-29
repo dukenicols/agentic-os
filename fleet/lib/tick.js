@@ -150,6 +150,11 @@ async function execute({ project, decision, state, registry, env, status, run, n
       }
     }
     p.runsByDay = { [day]: (p.runsByDay[day] || 0) + 1 }; // only today's count matters
+    if (decision.feedback) {
+      // Count revision runs per request, so feedback the agent doesn't act on returns to the human.
+      const served = new Set(decision.feedback.map((f) => f.at));
+      p.feedback = (p.feedback || []).map((f) => (served.has(f.at) ? { ...f, runs: (f.runs || 0) + 1 } : f));
+    }
     p.consecutiveFailures = ok ? 0 : (p.consecutiveFailures || 0) + 1;
     p.lastRun = { runId, action: decision.action, exitCode: r.exitCode, timedOut: r.timedOut, ok, durationMs: r.durationMs, at: now().toISOString() };
   });

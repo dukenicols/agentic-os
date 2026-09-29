@@ -1,0 +1,857 @@
+$ npm test
+
+> agentic-os-governance@0.1.0 test
+> node --test test/*.test.js
+
+TAP version 13
+# Subtest: AC1: status --json includes the plan hash
+ok 1 - AC1: status --json includes the plan hash
+  ---
+  duration_ms: 515.255446
+  type: 'test'
+  ...
+# Subtest: AC1: approve plan --expect succeeds only for the current plan hash, and records --via
+ok 2 - AC1: approve plan --expect succeeds only for the current plan hash, and records --via
+  ---
+  duration_ms: 587.239223
+  type: 'test'
+  ...
+# Subtest: AC1: approve ship --expect succeeds only for the current tree fingerprint
+ok 3 - AC1: approve ship --expect succeeds only for the current tree fingerprint
+  ---
+  duration_ms: 2106.724441
+  type: 'test'
+  ...
+# Subtest: AC1: without flags approval behaves as before; agents still cannot approve
+ok 4 - AC1: without flags approval behaves as before; agents still cannot approve
+  ---
+  duration_ms: 455.274625
+  type: 'test'
+  ...
+# Subtest: AC1: malformed flags are rejected without recording anything
+ok 5 - AC1: malformed flags are rejected without recording anything
+  ---
+  duration_ms: 553.333889
+  type: 'test'
+  ...
+# Subtest: gov help documents --expect (fleet detects support from it)
+ok 6 - gov help documents --expect (fleet detects support from it)
+  ---
+  duration_ms: 220.501641
+  type: 'test'
+  ...
+# Subtest: gov diff --patch shows real content even with hostile repo-local git attributes and config
+ok 7 - gov diff --patch shows real content even with hostile repo-local git attributes and config
+  ---
+  duration_ms: 558.150272
+  type: 'test'
+  ...
+# Subtest: diff shows real changes despite clean filters, assume-unchanged, skip-worktree and replace refs
+ok 8 - diff shows real changes despite clean filters, assume-unchanged, skip-worktree and replace refs
+  ---
+  duration_ms: 709.030942
+  type: 'test'
+  ...
+# Subtest: diff shows the whole current file when the base cannot be verified (base gone)
+ok 9 - diff shows the whole current file when the base cannot be verified (base gone)
+  ---
+  duration_ms: 530.663369
+  type: 'test'
+  ...
+# Subtest: diff shows NUL-containing files as text instead of hiding them
+ok 10 - diff shows NUL-containing files as text instead of hiding them
+  ---
+  duration_ms: 536.30377
+  type: 'test'
+  ...
+# Subtest: the line diff reconstructs both sides exactly
+ok 11 - the line diff reconstructs both sides exactly
+  ---
+  duration_ms: 5.955432
+  type: 'test'
+  ...
+# Subtest: diff shows byte changes that are not valid UTF-8, unambiguously
+ok 12 - diff shows byte changes that are not valid UTF-8, unambiguously
+  ---
+  duration_ms: 1.553389
+  type: 'test'
+  ...
+# Subtest: property: distinct byte strings always produce a visible change
+ok 13 - property: distinct byte strings always produce a visible change
+  ---
+  duration_ms: 13.782385
+  type: 'test'
+  ...
+# Subtest: symlinks are shown as their target, never followed
+ok 14 - symlinks are shown as their target, never followed
+  ---
+  duration_ms: 533.355768
+  type: 'test'
+  ...
+# Subtest: matchPath
+ok 15 - matchPath
+  ---
+  duration_ms: 1.795979
+  type: 'test'
+  ...
+# Subtest: validatePlan
+ok 16 - validatePlan
+  ---
+  duration_ms: 2.017472
+  type: 'test'
+  ...
+# Subtest: acceptanceCriteria dedupes and normalises ids
+ok 17 - acceptanceCriteria dedupes and normalises ids
+  ---
+  duration_ms: 0.374377
+  type: 'test'
+  ...
+# Subtest: diffManifests
+ok 18 - diffManifests
+  ---
+  duration_ms: 0.487581
+  type: 'test'
+  ...
+# Subtest: AC2: passphrase is stored only as an scrypt hash, 0600, and verifies in constant time
+ok 19 - AC2: passphrase is stored only as an scrypt hash, 0600, and verifies in constant time
+  ---
+  duration_ms: 280.916087
+  type: 'test'
+  ...
+# Subtest: AC2: `fleet passphrase` refuses without a TTY or inside an agent session
+ok 20 - AC2: `fleet passphrase` refuses without a TTY or inside an agent session
+  ---
+  duration_ms: 194.780005
+  type: 'test'
+  ...
+# Subtest: AC4: the rate limiter blocks after 5 failures for 15 minutes
+ok 21 - AC4: the rate limiter blocks after 5 failures for 15 minutes
+  ---
+  duration_ms: 0.414807
+  type: 'test'
+  ...
+# Subtest: AC3: GET approval returns the pending plan, its exact text and hash
+ok 22 - AC3: GET approval returns the pending plan, its exact text and hash
+  ---
+  duration_ms: 602.701316
+  type: 'test'
+  ...
+# Subtest: AC3: correct passphrase + current hash approves the plan, via fleet-ui, as the human
+ok 23 - AC3: correct passphrase + current hash approves the plan, via fleet-ui, as the human
+  ---
+  duration_ms: 1089.964748
+  type: 'test'
+  ...
+# Subtest: AC3: each failed condition returns its own 4xx and records nothing
+ok 24 - AC3: each failed condition returns its own 4xx and records nothing
+  ---
+  duration_ms: 1453.356354
+  type: 'test'
+  ...
+# Subtest: AC3: the plan changing after it was loaded voids the approval
+ok 25 - AC3: the plan changing after it was loaded voids the approval
+  ---
+  duration_ms: 837.845233
+  type: 'test'
+  ...
+# Subtest: AC3: fails closed without a passphrase, inside an agent session, or with an old gov
+ok 26 - AC3: fails closed without a passphrase, inside an agent session, or with an old gov
+  ---
+  duration_ms: 1441.001252
+  type: 'test'
+  ...
+# Subtest: AC3: approves ship bound to the tree fingerprint; the diff is served for review
+ok 27 - AC3: approves ship bound to the tree fingerprint; the diff is served for review
+  ---
+  duration_ms: 3191.643589
+  type: 'test'
+  ...
+# Subtest: AC4: 5 wrong passphrases lock out approvals and feedback with 429; failures are logged without the passphrase
+ok 28 - AC4: 5 wrong passphrases lock out approvals and feedback with 429; failures are logged without the passphrase
+  ---
+  duration_ms: 693.113616
+  type: 'test'
+  ...
+# Subtest: AC5: feedback is stored against the plan hash, makes the next tick revise the plan, and clears once the plan changes
+ok 29 - AC5: feedback is stored against the plan hash, makes the next tick revise the plan, and clears once the plan changes
+  ---
+  duration_ms: 1142.054611
+  type: 'test'
+  ...
+# Subtest: AC5: feedback needs the passphrase, a non-empty comment, and the current plan
+ok 30 - AC5: feedback needs the passphrase, a non-empty comment, and the current plan
+  ---
+  duration_ms: 654.966177
+  type: 'test'
+  ...
+# Subtest: continue prompt without feedback has no feedback block
+ok 31 - continue prompt without feedback has no feedback block
+  ---
+  duration_ms: 0.161049
+  type: 'test'
+  ...
+# Subtest: AC6: POST only on approve/feedback, only same-origin JSON; everything else stays 405
+ok 32 - AC6: POST only on approve/feedback, only same-origin JSON; everything else stays 405
+  ---
+  duration_ms: 587.304731
+  type: 'test'
+  ...
+# Subtest: AC7: the page offers approve / request changes / ship review, builds DOM safely and never stores the passphrase
+ok 33 - AC7: the page offers approve / request changes / ship review, builds DOM safely and never stores the passphrase
+  ---
+  duration_ms: 331.606037
+  type: 'test'
+  ...
+# Subtest: AC8: the passphrase appears nowhere: state, events, logs, ledger, responses
+ok 34 - AC8: the passphrase appears nowhere: state, events, logs, ledger, responses
+  ---
+  duration_ms: 1410.555504
+  type: 'test'
+  ...
+# Subtest: AC4: a parallel burst of wrong passphrases cannot outrun the rate limit
+ok 35 - AC4: a parallel burst of wrong passphrases cannot outrun the rate limit
+  ---
+  duration_ms: 466.457484
+  type: 'test'
+  ...
+# Subtest: a correct passphrase does not consume the attempt budget
+ok 36 - a correct passphrase does not consume the attempt budget
+  ---
+  duration_ms: 1882.268405
+  type: 'test'
+  ...
+# Subtest: HTML comments in a plan are part of the approval document and are shown by the UI
+ok 37 - HTML comments in a plan are part of the approval document and are shown by the UI
+  ---
+  duration_ms: 460.632024
+  type: 'test'
+  ...
+# Subtest: AC5: feedback no longer applies once the plan is approved (approval supersedes it)
+ok 38 - AC5: feedback no longer applies once the plan is approved (approval supersedes it)
+  ---
+  duration_ms: 1249.36347
+  type: 'test'
+  ...
+# Subtest: AC5: feedback the agent does not act on goes back to the human after 2 runs
+ok 39 - AC5: feedback the agent does not act on goes back to the human after 2 runs
+  ---
+  duration_ms: 1314.586178
+  type: 'test'
+  ...
+# Subtest: AC5: feedback from another task with identical plan text is ignored
+ok 40 - AC5: feedback from another task with identical plan text is ignored
+  ---
+  duration_ms: 0.311615
+  type: 'test'
+  ...
+# Subtest: a diff too large to show in full cannot be approved from the UI
+ok 41 - a diff too large to show in full cannot be approved from the UI
+  ---
+  duration_ms: 2447.95497
+  type: 'test'
+  ...
+# Subtest: AC1: missing fleet.json fails closed
+ok 42 - AC1: missing fleet.json fails closed
+  ---
+  duration_ms: 105.695495
+  type: 'test'
+  ...
+# Subtest: AC1: invalid fleet.json lists every problem and performs no runs
+ok 43 - AC1: invalid fleet.json lists every problem and performs no runs
+  ---
+  duration_ms: 872.351856
+  type: 'test'
+  ...
+# Subtest: AC1: a valid config loads with defaults applied
+ok 44 - AC1: a valid config loads with defaults applied
+  ---
+  duration_ms: 2.212767
+  type: 'test'
+  ...
+# Subtest: AC2: queue returns only incomplete tasks from the configured section of the project
+ok 45 - AC2: queue returns only incomplete tasks from the configured section of the project
+  ---
+  duration_ms: 0.840369
+  type: 'test'
+  ...
+# Subtest: AC2: a project without the configured section is an error, not an empty queue
+ok 46 - AC2: a project without the configured section is an error, not an empty queue
+  ---
+  duration_ms: 0.432224
+  type: 'test'
+  ...
+# Subtest: AC2: token comes only from ASANA_TOKEN; missing token is an error and tick runs nothing
+ok 47 - AC2: token comes only from ASANA_TOKEN; missing token is an error and tick runs nothing
+  ---
+  duration_ms: 5.797404
+  type: 'test'
+  ...
+# Subtest: AC2: fleet tick without ASANA_TOKEN exits with an error before any run
+ok 48 - AC2: fleet tick without ASANA_TOKEN exits with an error before any run
+  ---
+  duration_ms: 91.070526
+  type: 'test'
+  ...
+# Subtest: AC8: Asana errors never include the token
+ok 49 - AC8: Asana errors never include the token
+  ---
+  duration_ms: 0.661625
+  type: 'test'
+  ...
+# Subtest: AC3: start when no active task and the queue is non-empty
+ok 50 - AC3: start when no active task and the queue is non-empty
+  ---
+  duration_ms: 1.44503
+  type: 'test'
+  ...
+# Subtest: AC3: idle when there is no task and no queue
+ok 51 - AC3: idle when there is no task and no queue
+  ---
+  duration_ms: 0.208502
+  type: 'test'
+  ...
+# Subtest: AC3: an Asana task already mapped to a gov task is never started again
+ok 52 - AC3: an Asana task already mapped to a gov task is never started again
+  ---
+  duration_ms: 1.152265
+  type: 'test'
+  ...
+# Subtest: AC3: continue in build, review and test
+ok 53 - AC3: continue in build, review and test
+  ---
+  duration_ms: 0.475423
+  type: 'test'
+  ...
+# Subtest: AC3: continue in plan while the plan itself is unfinished
+ok 54 - AC3: continue in plan while the plan itself is unfinished
+  ---
+  duration_ms: 0.278949
+  type: 'test'
+  ...
+# Subtest: AC3: continue in plan after approval (the agent advances to build)
+ok 55 - AC3: continue in plan after approval (the agent advances to build)
+  ---
+  duration_ms: 0.291625
+  type: 'test'
+  ...
+# Subtest: once ship is approved fleet stops: releasing is the human's job
+ok 56 - once ship is approved fleet stops: releasing is the human's job
+  ---
+  duration_ms: 0.366956
+  type: 'test'
+  ...
+# Subtest: a start whose gov task was never recorded does not own whatever task is active
+ok 57 - a start whose gov task was never recorded does not own whatever task is active
+  ---
+  duration_ms: 0.229623
+  type: 'test'
+  ...
+# Subtest: AC3: await-human plan when only the human plan approval is missing
+ok 58 - AC3: await-human plan when only the human plan approval is missing
+  ---
+  duration_ms: 1.42411
+  type: 'test'
+  ...
+# Subtest: AC3: await-human ship when in ship awaiting approval
+ok 59 - AC3: await-human ship when in ship awaiting approval
+  ---
+  duration_ms: 0.654012
+  type: 'test'
+  ...
+# Subtest: AC3: awaiting a human is reported even when caps are hit
+ok 60 - AC3: awaiting a human is reported even when caps are hit
+  ---
+  duration_ms: 0.306043
+  type: 'test'
+  ...
+# Subtest: AC3: paused when the project is paused
+ok 61 - AC3: paused when the project is paused
+  ---
+  duration_ms: 0.227637
+  type: 'test'
+  ...
+# Subtest: AC3: paused when the daily run cap is hit
+ok 62 - AC3: paused when the daily run cap is hit
+  ---
+  duration_ms: 0.298891
+  type: 'test'
+  ...
+# Subtest: AC3: paused when consecutive failures reach the limit
+ok 63 - AC3: paused when consecutive failures reach the limit
+  ---
+  duration_ms: 0.216265
+  type: 'test'
+  ...
+# Subtest: paused when gov status failed; idle for a task the human started by hand
+ok 64 - paused when gov status failed; idle for a task the human started by hand
+  ---
+  duration_ms: 0.229894
+  type: 'test'
+  ...
+# Subtest: AC6: /api/fleet reports phase, gates with missing evidence, awaiting approval, and the Asana link
+ok 65 - AC6: /api/fleet reports phase, gates with missing evidence, awaiting approval, and the Asana link
+  ---
+  duration_ms: 699.969819
+  type: 'test'
+  ...
+# Subtest: AC6: serves plan/review/verification markdown and run log tails; 404s otherwise
+ok 66 - AC6: serves plan/review/verification markdown and run log tails; 404s otherwise
+  ---
+  duration_ms: 646.607799
+  type: 'test'
+  ...
+# Subtest: AC6: streams existing and new events over SSE
+ok 67 - AC6: streams existing and new events over SSE
+  ---
+  duration_ms: 487.798145
+  type: 'test'
+  ...
+# Subtest: AC6: every non-GET request is refused with 405 (except the two passphrase-protected POST routes)
+ok 68 - AC6: every non-GET request is refused with 405 (except the two passphrase-protected POST routes)
+  ---
+  duration_ms: 462.643872
+  type: 'test'
+  ...
+# Subtest: AC6: the CLI binds 127.0.0.1 by default
+ok 69 - AC6: the CLI binds 127.0.0.1 by default
+  ---
+  duration_ms: 0.570144
+  type: 'test'
+  ...
+# Subtest: AC7: the page renders projects, approval inbox, live feed and drill-down without reloads
+ok 70 - AC7: the page renders projects, approval inbox, live feed and drill-down without reloads
+  ---
+  duration_ms: 465.206694
+  type: 'test'
+  ...
+# Subtest: AC8: no API response contains the Asana token
+ok 71 - AC8: no API response contains the Asana token
+  ---
+  duration_ms: 598.992204
+  type: 'test'
+  ...
+# Subtest: a malformed URL gets 400 and the server keeps serving
+ok 72 - a malformed URL gets 400 and the server keeps serving
+  ---
+  duration_ms: 600.219672
+  type: 'test'
+  ...
+# Subtest: requests with an unexpected Host header are refused (DNS rebinding)
+ok 73 - requests with an unexpected Host header are refused (DNS rebinding)
+  ---
+  duration_ms: 611.132318
+  type: 'test'
+  ...
+# Subtest: AC4: never more than maxConcurrent agents at once
+ok 74 - AC4: never more than maxConcurrent agents at once
+  ---
+  duration_ms: 151.868147
+  type: 'test'
+  ...
+# Subtest: AC4: a project whose lock is held is skipped, not run twice
+ok 75 - AC4: a project whose lock is held is skipped, not run twice
+  ---
+  duration_ms: 5.785651
+  type: 'test'
+  ...
+# Subtest: AC4: a stale lock (dead holder) is reclaimed
+ok 76 - AC4: a stale lock (dead holder) is reclaimed
+  ---
+  duration_ms: 1.876482
+  type: 'test'
+  ...
+# Subtest: AC4: start → task mapped; the same Asana task is never started again
+ok 77 - AC4: start → task mapped; the same Asana task is never started again
+  ---
+  duration_ms: 1141.609615
+  type: 'test'
+  ...
+# Subtest: a start run that never opens a gov task counts as a failure and frees the project
+ok 78 - a start run that never opens a gov task counts as a failure and frees the project
+  ---
+  duration_ms: 668.890813
+  type: 'test'
+  ...
+# Subtest: AC5: runner invokes claude -p in the project dir with allowed tools and no permission bypass
+ok 79 - AC5: runner invokes claude -p in the project dir with allowed tools and no permission bypass
+  ---
+  duration_ms: 369.36035
+  type: 'test'
+  ...
+# Subtest: AC5: runner kills the agent at the timeout
+ok 80 - AC5: runner kills the agent at the timeout
+  ---
+  duration_ms: 303.984803
+  type: 'test'
+  ...
+# Subtest: AC5: a missing claude binary is a failed run, not a crash
+ok 81 - AC5: a missing claude binary is a failed run, not a crash
+  ---
+  duration_ms: 2.933256
+  type: 'test'
+  ...
+# Subtest: AC5: tick records run-start and run-end with exit code and duration, and a per-run log
+ok 82 - AC5: tick records run-start and run-end with exit code and duration, and a per-run log
+  ---
+  duration_ms: 378.744562
+  type: 'test'
+  ...
+# Subtest: AC8: the Asana token never reaches the agent env, logs, events or state
+ok 83 - AC8: the Asana token never reaches the agent env, logs, events or state
+  ---
+  duration_ms: 895.857955
+  type: 'test'
+  ...
+# Subtest: an interrupted start run is recovered: its gov task is adopted and mapped
+ok 84 - an interrupted start run is recovered: its gov task is adopted and mapped
+  ---
+  duration_ms: 455.085595
+  type: 'test'
+  ...
+# Subtest: an interrupted start never adopts a task the human opened by hand
+ok 85 - an interrupted start never adopts a task the human opened by hand
+  ---
+  duration_ms: 453.039695
+  type: 'test'
+  ...
+# Subtest: reconcile leaves an in-progress start alone while its lock is held
+ok 86 - reconcile leaves an in-progress start alone while its lock is held
+  ---
+  duration_ms: 211.545495
+  type: 'test'
+  ...
+# Subtest: fleet pause issued during a run survives the tick
+ok 87 - fleet pause issued during a run survives the tick
+  ---
+  duration_ms: 4.649382
+  type: 'test'
+  ...
+# Subtest: a project paused after the decision but before its run starts is not run
+ok 88 - a project paused after the decision but before its run starts is not run
+  ---
+  duration_ms: 6.125286
+  type: 'test'
+  ...
+# Subtest: start prompt: Asana text stays inside the fence and the shell title is sanitised
+ok 89 - start prompt: Asana text stays inside the fence and the shell title is sanitised
+  ---
+  duration_ms: 0.362052
+  type: 'test'
+  ...
+# Subtest: continue prompt never asks the agent to release
+ok 90 - continue prompt never asks the agent to release
+  ---
+  duration_ms: 0.127472
+  type: 'test'
+  ...
+# Subtest: an empty lock file (holder mid-write) is treated as held, unless old
+ok 91 - an empty lock file (holder mid-write) is treated as held, unless old
+  ---
+  duration_ms: 1.471233
+  type: 'test'
+  ...
+# Subtest: the timeout also kills processes the agent started
+ok 92 - the timeout also kills processes the agent started
+  ---
+  duration_ms: 3006.832942
+  type: 'test'
+  ...
+# Subtest: the lock stays held while the recorded agent is alive, even if the supervisor died
+ok 93 - the lock stays held while the recorded agent is alive, even if the supervisor died
+  ---
+  duration_ms: 2.071286
+  type: 'test'
+  ...
+# Subtest: tick records the spawned agent pid in the project lock
+ok 94 - tick records the spawned agent pid in the project lock
+  ---
+  duration_ms: 4.664309
+  type: 'test'
+  ...
+# Subtest: killAllAgents stops running agents (used when the supervisor is interrupted)
+ok 95 - killAllAgents stops running agents (used when the supervisor is interrupted)
+  ---
+  duration_ms: 302.895833
+  type: 'test'
+  ...
+# Subtest: recovery refuses a task with the right title that predates the start attempt
+ok 96 - recovery refuses a task with the right title that predates the start attempt
+  ---
+  duration_ms: 451.490643
+  type: 'test'
+  ...
+# Subtest: if gov status fails right after a start run, the attempt is kept for the next pass to resolve
+ok 97 - if gov status fails right after a start run, the attempt is kept for the next pass to resolve
+  ---
+  duration_ms: 3.387193
+  type: 'test'
+  ...
+# Subtest: exact-text view shows every character; invisible ones are made visible
+ok 98 - exact-text view shows every character; invisible ones are made visible
+  ---
+  duration_ms: 2.837145
+  type: 'test'
+  ...
+# Subtest: formatted view keeps fence lines, comments inside fences, and caps indentation
+ok 99 - formatted view keeps fence lines, comments inside fences, and caps indentation
+  ---
+  duration_ms: 3.736721
+  type: 'test'
+  ...
+# Subtest: an unterminated fence or comment is still shown
+ok 100 - an unterminated fence or comment is still shown
+  ---
+  duration_ms: 0.613334
+  type: 'test'
+  ...
+# Subtest: diff view reveals invisible characters too
+ok 101 - diff view reveals invisible characters too
+  ---
+  duration_ms: 1.115575
+  type: 'test'
+  ...
+# Subtest: the approval panel defaults to the exact text
+ok 102 - the approval panel defaults to the exact text
+  ---
+  duration_ms: 0.586566
+  type: 'test'
+  ...
+# Subtest: astral and property-based invisibles are revealed: tag characters, variation selectors, fillers
+ok 103 - astral and property-based invisibles are revealed: tag characters, variation selectors, fillers
+  ---
+  duration_ms: 0.869349
+  type: 'test'
+  ...
+# Subtest: diff view classifies by position: content cannot pose as a file header; CR is revealed
+ok 104 - diff view classifies by position: content cannot pose as a file header; CR is revealed
+  ---
+  duration_ms: 0.759045
+  type: 'test'
+  ...
+# Subtest: AC1: no cross-repo exemption — releases are gated in any directory
+ok 105 - AC1: no cross-repo exemption — releases are gated in any directory
+  ---
+  duration_ms: 709.139198
+  type: 'test'
+  ...
+# Subtest: AC1: in SHIP with a passing gate, releases are allowed
+ok 106 - AC1: in SHIP with a passing gate, releases are allowed
+  ---
+  duration_ms: 2183.466603
+  type: 'test'
+  ...
+# Subtest: AC2: the built-in release detector sees through flags and indirection
+ok 107 - AC2: the built-in release detector sees through flags and indirection
+  ---
+  duration_ms: 3181.819061
+  type: 'test'
+  ...
+# Subtest: AC3: the tamper check denies every known quote/comment trick
+ok 108 - AC3: the tamper check denies every known quote/comment trick
+  ---
+  duration_ms: 1225.475914
+  type: 'test'
+  ...
+# Subtest: AC4: invalid or wrongly shaped config fails closed everywhere
+ok 109 - AC4: invalid or wrongly shaped config fails closed everywhere
+  ---
+  duration_ms: 5796.490199
+  type: 'test'
+  ...
+# Subtest: AC5: guard errors and unreadable input fail closed
+ok 110 - AC5: guard errors and unreadable input fail closed
+  ---
+  duration_ms: 900.674098
+  type: 'test'
+  ...
+# Subtest: AC6: a cwd outside the governed tree falls back to CLAUDE_PROJECT_DIR
+ok 111 - AC6: a cwd outside the governed tree falls back to CLAUDE_PROJECT_DIR
+  ---
+  duration_ms: 259.147862
+  type: 'test'
+  ...
+# Subtest: AC7: installs always protect the framework code, whatever the source config says
+ok 112 - AC7: installs always protect the framework code, whatever the source config says
+  ---
+  duration_ms: 105.182322
+  type: 'test'
+  ...
+# Subtest: AC8: .idea is ignored and untracked
+ok 113 - AC8: .idea is ignored and untracked
+  ---
+  duration_ms: 24.621433
+  type: 'test'
+  ...
+# Subtest: AC9: stop does not block when only human approvals are missing
+ok 114 - AC9: stop does not block when only human approvals are missing
+  ---
+  duration_ms: 2500.314043
+  type: 'test'
+  ...
+# Subtest: AC10: an unknown mode denies instead of asking
+ok 115 - AC10: an unknown mode denies instead of asking
+  ---
+  duration_ms: 175.889899
+  type: 'test'
+  ...
+# Subtest: edits: blocked with no task, blocked in PLAN, allowed in BUILD, frozen in SHIP
+ok 116 - edits: blocked with no task, blocked in PLAN, allowed in BUILD, frozen in SHIP
+  ---
+  duration_ms: 3176.968868
+  type: 'test'
+  ...
+# Subtest: advisory mode asks instead of denying — but tamper/secrets/approvals stay hard denies
+ok 117 - advisory mode asks instead of denying — but tamper/secrets/approvals stay hard denies
+  ---
+  duration_ms: 452.080231
+  type: 'test'
+  ...
+# Subtest: mode off disables the guard
+ok 118 - mode off disables the guard
+  ---
+  duration_ms: 236.208315
+  type: 'test'
+  ...
+# Subtest: evidence and governance files cannot be written by the agent
+ok 119 - evidence and governance files cannot be written by the agent
+  ---
+  duration_ms: 1338.022629
+  type: 'test'
+  ...
+# Subtest: secrets: no reading or writing
+ok 120 - secrets: no reading or writing
+  ---
+  duration_ms: 876.130172
+  type: 'test'
+  ...
+# Subtest: bash: approvals, tampering, and dangerous commands are blocked
+ok 121 - bash: approvals, tampering, and dangerous commands are blocked
+  ---
+  duration_ms: 1292.499115
+  type: 'test'
+  ...
+# Subtest: bash: ordinary commands and gov invocations pass
+ok 122 - bash: ordinary commands and gov invocations pass
+  ---
+  duration_ms: 924.948105
+  type: 'test'
+  ...
+# Subtest: release commands are gated on SHIP + passing ship gate
+ok 123 - release commands are gated on SHIP + passing ship gate
+  ---
+  duration_ms: 2626.574852
+  type: 'test'
+  ...
+# Subtest: stop hook: blocks un-evidenced phase once, lets approval waits and loops through
+ok 124 - stop hook: blocks un-evidenced phase once, lets approval waits and loops through
+  ---
+  duration_ms: 1271.756622
+  type: 'test'
+  ...
+# Subtest: session start injects live state
+ok 125 - session start injects live state
+  ---
+  duration_ms: 570.211557
+  type: 'test'
+  ...
+# Subtest: installs into a fresh repo, detects npm commands, and is idempotent
+ok 126 - installs into a fresh repo, detects npm commands, and is idempotent
+  ---
+  duration_ms: 239.164057
+  type: 'test'
+  ...
+# Subtest: existing AGENTS.md content is preserved
+ok 127 - existing AGENTS.md content is preserved
+  ---
+  duration_ms: 214.880346
+  type: 'test'
+  ...
+# Subtest: mergeSettings keeps the user’s hooks and permissions
+ok 128 - mergeSettings keeps the user’s hooks and permissions
+  ---
+  duration_ms: 0.629439
+  type: 'test'
+  ...
+# Subtest: happy path: plan → build → review → test → ship
+ok 129 - happy path: plan → build → review → test → ship
+  ---
+  duration_ms: 2360.59799
+  type: 'test'
+  ...
+# Subtest: plan phase cannot be left without a complete, approved plan
+ok 130 - plan phase cannot be left without a complete, approved plan
+  ---
+  duration_ms: 503.494899
+  type: 'test'
+  ...
+# Subtest: editing the plan after approval voids the approval
+ok 131 - editing the plan after approval voids the approval
+  ---
+  duration_ms: 504.560947
+  type: 'test'
+  ...
+# Subtest: the agent cannot approve
+ok 132 - the agent cannot approve
+  ---
+  duration_ms: 374.762642
+  type: 'test'
+  ...
+# Subtest: a failing build is recorded but does not satisfy the gate
+ok 133 - a failing build is recorded but does not satisfy the gate
+  ---
+  duration_ms: 920.833696
+  type: 'test'
+  ...
+# Subtest: configured commands are authoritative: no substituting `true`
+ok 134 - configured commands are authoritative: no substituting `true`
+  ---
+  duration_ms: 590.695951
+  type: 'test'
+  ...
+# Subtest: changing code after review makes build and review stale
+ok 135 - changing code after review makes build and review stale
+  ---
+  duration_ms: 1208.257693
+  type: 'test'
+  ...
+# Subtest: committing does not invalidate evidence (fingerprint is content-based)
+ok 136 - committing does not invalidate evidence (fingerprint is content-based)
+  ---
+  duration_ms: 965.356095
+  type: 'test'
+  ...
+# Subtest: review must cover every changed file and have no open blockers
+ok 137 - review must cover every changed file and have no open blockers
+  ---
+  duration_ms: 1273.643621
+  type: 'test'
+  ...
+# Subtest: verification must map every AC to PASS with evidence
+ok 138 - verification must map every AC to PASS with evidence
+  ---
+  duration_ms: 1292.66635
+  type: 'test'
+  ...
+# Subtest: tampering with the ledger voids all evidence
+ok 139 - tampering with the ledger voids all evidence
+  ---
+  duration_ms: 669.345202
+  type: 'test'
+  ...
+# Subtest: only one active task; abort closes it
+ok 140 - only one active task; abort closes it
+  ---
+  duration_ms: 566.389843
+  type: 'test'
+  ...
+1..140
+# tests 140
+# suites 0
+# pass 140
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 21867.700255
+
+[exit 0]

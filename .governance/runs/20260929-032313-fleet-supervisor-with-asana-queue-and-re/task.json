@@ -2,6 +2,7 @@
   "id": "20260929-032313-fleet-supervisor-with-asana-queue-and-re",
   "title": "fleet supervisor with Asana queue and read-only UI",
   "phase": "ship",
-  "status": "active",
-  "createdAt": "2026-09-29T03:23:14.041Z"
+  "status": "shipped",
+  "createdAt": "2026-09-29T03:23:14.041Z",
+  "closedAt": "2026-09-29T03:50:43.560Z"
 }

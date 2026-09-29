@@ -33,9 +33,18 @@ const { spawnSync } = require('child_process');
 let stdin = '';
 process.stdin.on('data', (d) => (stdin += d));
 process.stdin.on('end', () => {
-  const call = { args: process.argv.slice(2), cwd: process.cwd(), stdin, env: process.env, at: Date.now() };
+  // Record only the variables the tests assert on: never the developer's whole environment,
+  // which holds real credentials and ends up in logs (and in test failure output).
+  const env = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (/^(ASANA_TOKEN|CLAUDECODE|CLAUDE_PROJECT_DIR|GOV_MODE|FAKE_(?!SECRET$).*)$/.test(k)) env[k] = v;
+  }
+  // leaked: did FAKE_SECRET's value reach the agent under any other name? (checked without recording values)
+  const secret = process.env.FAKE_SECRET;
+  const leaked = !!secret && Object.entries(process.env).some(([k, v]) => k !== 'FAKE_SECRET' && String(v).includes(secret));
+  const call = { args: process.argv.slice(2), cwd: process.cwd(), stdin, env, leaked, secretSeen: !!secret, at: Date.now() };
   if (process.env.FAKE_CALLS) fs.appendFileSync(process.env.FAKE_CALLS, JSON.stringify(call) + '\\n');
-  console.log(JSON.stringify({ type: 'system', subtype: 'init', env: process.env }));
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', env }));
   if (process.env.FAKE_START === '1') {
     spawnSync(process.execPath, [path.join(process.cwd(), '.governance', 'bin', 'gov'), 'start', 'from fake'], {
       cwd: process.cwd(), env: { ...process.env, CLAUDECODE: '1' },

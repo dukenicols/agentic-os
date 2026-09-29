@@ -8,11 +8,13 @@ const { createAsana } = require('../lib/asana');
 const { tick } = require('../lib/tick');
 const { killAllAgents } = require('../lib/runner');
 const { createServer, snapshot } = require('../lib/server');
+const { hashPassphrase, writeApprover, approverPath, MIN_LENGTH } = require('../lib/approver');
 
 const HELP = `fleet — agentic-os supervisor for many repos (config: $FLEET_HOME/fleet.json, default ~/.agentic-os)
 
   fleet tick                        one pass: read gov status + Asana queue per repo, run agents where there is work
-  fleet serve [--host H] [--port P] read-only web UI (default 127.0.0.1:7420)
+  fleet serve [--host H] [--port P] web UI (default 127.0.0.1:7420); approving from it needs the passphrase
+  fleet passphrase                  set the passphrase the UI asks for before approving (interactive terminal only)
   fleet status                      terminal summary and approval inbox
   fleet pause <project> [reason]    stop scheduling runs for a project
   fleet resume <project>            resume it (also clears the consecutive-failure counter)
@@ -28,6 +30,7 @@ async function main(argv) {
   if (cmd === 'help' || cmd === '--help' || cmd === '-h') return void process.stdout.write(HELP);
 
   const home = fleetHome();
+  if (cmd === 'passphrase') return setPassphrase(home);
   const registry = loadRegistry(home);
   const state = new FleetState(home);
 
@@ -96,6 +99,49 @@ async function main(argv) {
     default:
       throw new Error(`Unknown command: ${cmd}\n\n${HELP}`);
   }
+}
+
+async function setPassphrase(home) {
+  if (process.env.CLAUDECODE) throw new Error('the approval passphrase is set by the human, not through an agent.');
+  if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error('run `fleet passphrase` in an interactive terminal.');
+  console.log(`The fleet UI will ask for this passphrase before every approval or change request.`);
+  console.log(`Only an scrypt hash is stored (${approverPath(home)}). At least ${MIN_LENGTH} characters.`);
+  const a = await askHidden('Passphrase: ');
+  const b = await askHidden('Repeat:     ');
+  if (a !== b) throw new Error('the two entries differ; nothing changed.');
+  writeApprover(home, await hashPassphrase(a));
+  console.log('✔ passphrase set. UI approvals are enabled.');
+}
+
+/** Read a line from the terminal without echoing it. */
+function askHidden(question) {
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    process.stdout.write(question);
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+    let value = '';
+    const onData = (chunk) => {
+      for (const c of chunk) {
+        if (c === '\r' || c === '\n' || c === '\u0004') {
+          stdin.setRawMode(false);
+          stdin.pause();
+          stdin.removeListener('data', onData);
+          process.stdout.write('\n');
+          return resolve(value);
+        }
+        if (c === '\u0003') {
+          stdin.setRawMode(false);
+          process.stdout.write('\n');
+          process.exit(130);
+        }
+        if (c === '\u007f' || c === '\b') value = value.slice(0, -1);
+        else value += c;
+      }
+    };
+    stdin.on('data', onData);
+  });
 }
 
 main(process.argv.slice(2)).catch((err) => {

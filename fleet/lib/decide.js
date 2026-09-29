@@ -3,6 +3,7 @@
 // memory of that repo, and its Asana queue, what should happen this tick?
 
 const HUMAN_GATES = new Set(['plan', 'ship']);
+const MAX_FEEDBACK_RUNS = 2;
 
 /**
  * @param {object} a
@@ -24,14 +25,22 @@ function decide({ status, pstate, queue = [], limits, today }) {
       return { action: 'idle', reason: `active task ${task.id} was not started by fleet; leaving it to the human` };
     }
     const g = status.gates?.[task.phase];
-    if (HUMAN_GATES.has(task.phase) && g && g.missing.length && g.missing.length === (g.human || []).length) {
+    // Changes the human requested on this exact plan text of this task, not yet addressed. Only while the
+    // plan is unapproved (an approval supersedes the request) and for a bounded number of revision runs
+    // (if the agent keeps not changing the plan, it goes back to the human).
+    const feedback =
+      task.phase === 'plan' && status.planHash && g && !g.ok
+        ? (pstate.feedback || []).filter((f) => f.planHash === status.planHash && f.taskId === task.id && (f.runs || 0) < MAX_FEEDBACK_RUNS)
+        : [];
+    const humanOnly = HUMAN_GATES.has(task.phase) && g && g.missing.length && g.missing.length === (g.human || []).length;
+    if (humanOnly && !feedback.length) {
       return { action: 'await-human', gate: task.phase, taskId: task.id };
     }
     // Releasing (push, PR, `gov ship`) is the human's job: fleet stops once ship is approved.
     if (task.phase === 'ship' && g && !g.missing.length) {
       return { action: 'idle', reason: 'ship approved — release is yours: push/PR, then `gov ship <ref>`' };
     }
-    run = { action: 'continue', taskId: task.id, phase: task.phase };
+    run = { action: 'continue', taskId: task.id, phase: task.phase, ...(feedback.length ? { feedback } : {}) };
   } else {
     const mapped = pstate.mappings || {};
     const next = queue.find((t) => !(t.gid in mapped));
@@ -48,4 +57,4 @@ function decide({ status, pstate, queue = [], limits, today }) {
   return run;
 }
 
-module.exports = { decide };
+module.exports = { decide, MAX_FEEDBACK_RUNS };

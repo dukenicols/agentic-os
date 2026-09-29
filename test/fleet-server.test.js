@@ -127,7 +127,7 @@ test('AC6: streams existing and new events over SSE', async (t) => {
   assert.match(got, /"type":"awaiting-human"/);
 });
 
-test('AC6: every non-GET request is refused with 405', async (t) => {
+test('AC6: every non-GET request is refused with 405 (except the two passphrase-protected POST routes)', async (t) => {
   const { state, registry } = setup();
   const server = createServer({ registry, state });
   const { port } = await listen(server, '127.0.0.1');
@@ -136,6 +136,11 @@ test('AC6: every non-GET request is refused with 405', async (t) => {
     for (const p of ['/', '/api/fleet', '/api/projects/web/files/plan']) {
       assert.equal((await request(port, p, m)).code, 405, `${m} ${p}`);
     }
+  }
+  // The only writes: POST to /approve and /feedback. They are not 405, but without the page's Origin they are refused.
+  for (const p of ['/api/projects/web/approve', '/api/projects/web/feedback']) {
+    assert.equal((await request(port, p, 'POST')).code, 403, p);
+    assert.equal((await request(port, p, 'PUT')).code, 405, p);
   }
 });
 
