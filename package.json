@@ -18,7 +18,8 @@
     "hooks"
   ],
   "bin": {
-    "gov": ".governance/bin/gov"
+    "gov": ".governance/bin/gov",
+    "fleet": "fleet/bin/fleet"
   },
   "engines": {
     "node": ">=18"

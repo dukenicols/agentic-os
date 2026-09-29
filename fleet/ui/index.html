@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agentic-os fleet</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #667085; --line: #e3e6eb;
+  --ok: #1a7f37; --bad: #c62828; --warn: #b54708; --warn-bg: #fff4e5; --accent: #3b5bdb; --chip: #eef1f5;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1216; --panel: #171b21; --ink: #e6e8eb; --muted: #8b95a3; --line: #262c35;
+    --ok: #3fb950; --bad: #f85149; --warn: #f0a24a; --warn-bg: #2a1f10; --accent: #7c93ff; --chip: #212730; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: baseline; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+header h1 { font-size: 16px; margin: 0; }
+header .meta { color: var(--muted); font-size: 12px; }
+.conn { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--bad); margin-right: 6px; }
+.conn.on { background: var(--ok); }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px 20px; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 4px 0 8px; }
+.inbox { background: var(--warn-bg); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
+.inbox:empty { display: none; }
+.inbox code { font-family: var(--mono); font-size: 12px; background: var(--panel); padding: 2px 6px; border-radius: 4px; }
+.inbox div + div { margin-top: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+.card:hover { border-color: var(--accent); }
+.card.awaiting { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn) inset; }
+.card.err { border-color: var(--bad); }
+.row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.name { font-weight: 600; }
+.pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.pill.run { background: var(--accent); color: #fff; }
+.pill.wait { background: var(--warn); color: #fff; }
+.pill.bad { background: var(--bad); color: #fff; }
+.title { margin: 6px 0; overflow-wrap: anywhere; }
+.gates { display: flex; gap: 4px; margin: 8px 0; }
+.gate { flex: 1; text-align: center; font-size: 10px; padding: 3px 0; border-radius: 4px; background: var(--chip); color: var(--muted); }
+.gate.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.gate.here { outline: 2px solid var(--accent); outline-offset: -2px; }
+.small { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.small a { color: var(--accent); }
+.feed { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; max-height: calc(100vh - 120px); overflow: auto; }
+.ev { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.ev time { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+.ev b { font-weight: 600; }
+.ev.bad b { color: var(--bad); } .ev.wait b { color: var(--warn); } .ev.good b { color: var(--ok); }
+dialog { width: min(1000px, calc(100vw - 32px)); height: min(85vh, 900px); border: 1px solid var(--line); border-radius: 12px; padding: 0; background: var(--panel); color: var(--ink); }
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+.dlg { display: flex; flex-direction: column; height: 100%; }
+.dlg header { position: sticky; top: 0; }
+.tabs { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tabs button { border: 1px solid var(--line); background: var(--chip); color: var(--ink); border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+.tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.close { margin-left: auto; }
+pre { margin: 0; padding: 12px 16px; flex: 1; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--mono); }
+ul.missing { margin: 4px 0 0 16px; padding: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>agentic-os fleet</h1>
+  <span class="meta"><span id="conn" class="conn"></span><span id="summary">cargando…</span></span>
+  <span class="meta" id="updated"></span>
+</header>
+<main>
+  <section>
+    <div class="inbox" id="inbox"></div>
+    <h2>Proyectos</h2>
+    <div class="grid" id="grid"></div>
+  </section>
+  <aside>
+    <h2>Actividad</h2>
+    <div class="feed" id="feed"></div>
+  </aside>
+</main>
+
+<dialog id="dlg">
+  <div class="dlg">
+    <div class="tabs" id="tabs"></div>
+    <pre id="body"></pre>
+  </div>
+</dialog>
+
+<script>
+'use strict';
+const PHASES = ['plan', 'build', 'review', 'test', 'ship'];
+const $ = (id) => document.getElementById(id);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') n.className = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) n.append(k.nodeType ? k : String(k));
+  return n;
+};
+const ago = (iso) => {
+  if (!iso) return '';
+  const s = Math.round((Date.now() - new Date(iso)) / 1000);
+  return s < 60 ? `hace ${s}s` : s < 3600 ? `hace ${Math.round(s / 60)}m` : s < 86400 ? `hace ${Math.round(s / 3600)}h` : `hace ${Math.round(s / 86400)}d`;
+};
+let projects = [];
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/fleet');
+    const data = await r.json();
+    projects = data.projects;
+    render();
+    $('updated').textContent = `actualizado ${new Date(data.generatedAt).toLocaleTimeString()}`;
+  } catch (e) {
+    $('summary').textContent = `error: ${e.message}`;
+  }
+}
+
+function status(p) {
+  if (p.error) return ['error', 'bad'];
+  if (!p.enabled) return ['deshabilitado', ''];
+  if (p.paused) return ['pausado', 'bad'];
+  if (p.awaiting) return [`espera tu firma: ${p.awaiting}`, 'wait'];
+  if (p.lastDecision?.action === 'paused') return ['pausado', 'bad'];
+  if (p.task) return [p.task.phase, 'run'];
+  return ['inactivo', ''];
+}
+
+function render() {
+  const waiting = projects.filter((p) => p.awaiting);
+  const active = projects.filter((p) => p.task).length;
+  $('summary').textContent = `${projects.length} proyectos · ${active} con tarea activa · ${waiting.length} esperan tu aprobación`;
+
+  $('inbox').replaceChildren(...(waiting.length ? [el('h2', {}, 'Necesita tu aprobación')] : []),
+    ...waiting.map((p) => el('div', {},
+      el('b', {}, p.name), ` — ${p.task.title} `,
+      el('code', {}, `cd ${p.path} && .governance/bin/gov approve ${p.awaiting}`))));
+
+  $('grid').replaceChildren(...projects.map((p) => {
+    const [label, cls] = status(p);
+    const reason = p.error || p.pausedReason || (p.lastDecision?.action === 'paused' || p.lastDecision?.action === 'idle' ? p.lastDecision.reason : null);
+    return el('div', { class: `card ${p.awaiting ? 'awaiting' : ''} ${p.error ? 'err' : ''}`, onclick: () => open(p.name) },
+      el('div', { class: 'row' }, el('span', { class: 'name' }, p.name), el('span', { class: `pill ${cls}` }, label)),
+      p.task ? el('div', { class: 'title' }, p.task.title) : el('div', { class: 'title small' }, 'sin tarea activa'),
+      p.gates ? el('div', { class: 'gates' }, PHASES.map((ph) =>
+        el('span', { class: `gate ${p.gates[ph].ok ? 'ok' : ''} ${p.task.phase === ph ? 'here' : ''}`, title: p.gates[ph].missing.join('\n') || 'ok' }, ph))) : null,
+      p.asanaTask ? el('div', { class: 'small' }, 'Asana: ', /^https:\/\//.test(p.asanaTask.url || '') ? el('a', { href: p.asanaTask.url, target: '_blank', rel: 'noopener', onclick: (e) => e.stopPropagation() }, p.asanaTask.name) : p.asanaTask.name) : null,
+      el('div', { class: 'small' }, `cola: ${p.queue.length}`, p.queueError ? ` (error Asana: ${p.queueError})` : '',
+        p.lastRun ? ` · última ejecución ${ago(p.lastRun.at)} ${p.lastRun.ok ? '✔' : '✘'} ${Math.round(p.lastRun.durationMs / 1000)}s` : ''),
+      reason ? el('div', { class: 'small' }, reason) : null);
+  }));
+}
+
+function evLine(e) {
+  const map = {
+    'run-start': ['', `inicia ${e.action}${e.phase ? ` (${e.phase})` : ''}${e.asanaTask ? ` — ${e.asanaTask}` : ''}`],
+    'run-end': [e.ok ? 'good' : 'bad', `terminó ${e.action}: ${e.ok ? 'ok' : `falló (exit ${e.exitCode}${e.timedOut ? ', timeout' : ''})`} en ${Math.round(e.durationMs / 1000)}s`],
+    'awaiting-human': ['wait', `espera \`gov approve ${e.gate}\``],
+    'paused': ['bad', `pausado: ${e.reason}`],
+    'asana-error': ['bad', `Asana: ${e.error}`],
+    'task-closed': ['good', `tarea cerrada ${e.taskId}`],
+    'skipped-locked': ['', 'omitido: ya hay un agente corriendo'],
+    'tick': ['', `ciclo del supervisor (${(e.projects || []).length} proyectos)`],
+    'pause': ['bad', `pausado por humano`], 'resume': ['good', 'reanudado por humano'],
+  };
+  const [cls, msg] = map[e.type] || ['', e.type];
+  return el('div', { class: `ev ${cls}` }, el('time', {}, new Date(e.at).toLocaleString()), ' ',
+    e.project ? el('b', {}, e.project) : null, ' ', msg,
+    e.runId ? el('div', {}, el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); open(e.project, e.runId); } }, 'ver log')) : null);
+}
+
+function connect() {
+  const src = new EventSource('/api/events');
+  let t;
+  src.onopen = () => $('conn').classList.add('on');
+  src.onerror = () => $('conn').classList.remove('on');
+  src.onmessage = (m) => {
+    const e = JSON.parse(m.data);
+    $('feed').prepend(evLine(e));
+    while ($('feed').children.length > 300) $('feed').lastChild.remove();
+    clearTimeout(t); t = setTimeout(refresh, 500);
+  };
+}
+
+// Claude's stream-json log → readable transcript; anything unparseable is shown as-is.
+function formatLog(raw) {
+  return raw.split('\n').map((line) => {
+    let j; try { j = JSON.parse(line); } catch { return line; }
+    if (j.type === 'assistant' && j.message?.content) {
+      return j.message.content.map((c) => c.type === 'text' ? `🤖 ${c.text}` : c.type === 'tool_use' ? `🔧 ${c.name} ${JSON.stringify(c.input).slice(0, 400)}` : '').filter(Boolean).join('\n');
+    }
+    if (j.type === 'user' && Array.isArray(j.message?.content)) {
+      return j.message.content.filter((c) => c.type === 'tool_result').map((c) => {
+        const t = Array.isArray(c.content) ? c.content.map((x) => x.text || '').join('') : String(c.content ?? '');
+        return `   ↳ ${t.slice(0, 600).replace(/\n/g, '\n     ')}`;
+      }).join('\n');
+    }
+    if (j.type === 'result') return `\n== resultado: ${j.subtype || ''} ${j.result ? `\n${j.result}` : ''}`;
+    if (j.type === 'system') return `· ${j.subtype || 'system'}`;
+    return '';
+  }).filter(Boolean).join('\n');
+}
+
+let logTimer;
+function open(name, runId) {
+  const p = projects.find((x) => x.name === name);
+  if (!p) return;
+  const tabs = [['estado', () => Promise.resolve(overview(p))]];
+  if (p.task) for (const d of ['plan', 'review', 'verification']) tabs.push([d, () => get(`/api/projects/${encodeURIComponent(name)}/files/${d}`)]);
+  const rid = runId || p.lastRun?.runId;
+  if (rid) tabs.push([runId ? `log ${rid.slice(0, 19)}` : 'último log', () => get(`/api/runs/${encodeURIComponent(name)}/${encodeURIComponent(rid)}/log`).then(formatLog), true]);
+  const show = (i) => {
+    clearInterval(logTimer);
+    [...$('tabs').querySelectorAll('button[data-i]')].forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    const [, load, live] = tabs[i];
+    const go = () => load().then((t) => { const body = $('body'); const atEnd = body.scrollTop + body.clientHeight >= body.scrollHeight - 20; body.textContent = t; if (live && atEnd) body.scrollTop = body.scrollHeight; });
+    $('body').textContent = 'cargando…';
+    go();
+    if (live) logTimer = setInterval(go, 3000);
+  };
+  $('tabs').replaceChildren(el('b', { style: 'align-self:center;margin-right:8px' }, name),
+    ...tabs.map(([label], i) => el('button', { 'data-i': i, onclick: () => show(i) }, label)),
+    el('button', { class: 'close', onclick: () => $('dlg').close() }, 'cerrar'));
+  $('dlg').showModal();
+  show(runId ? tabs.length - 1 : 0);
+}
+$('dlg').addEventListener('close', () => clearInterval(logTimer));
+
+async function get(url) {
+  const r = await fetch(url);
+  const t = await r.text();
+  if (!r.ok) { try { return `(${JSON.parse(t).error})`; } catch { return `(${r.status})`; } }
+  return t;
+}
+
+function overview(p) {
+  const lines = [`Proyecto: ${p.name}`, p.error ? `Error: ${p.error}` : null,
+    p.task ? `Tarea: ${p.task.title}\nID: ${p.task.id}\nFase: ${p.task.phase}   archivos cambiados: ${p.changed}` : 'Sin tarea activa',
+    p.asanaTask ? `Asana: ${p.asanaTask.name} ${p.asanaTask.url || ''}` : null,
+    p.paused ? `PAUSADO: ${p.pausedReason || ''}` : null,
+    p.lastDecision ? `Última decisión: ${p.lastDecision.action}${p.lastDecision.reason ? ` — ${p.lastDecision.reason}` : ''} (${ago(p.lastDecision.at)})` : null,
+    `Fallos consecutivos: ${p.consecutiveFailures}`, ''];
+  if (p.gates) for (const ph of PHASES) {
+    lines.push(`${p.gates[ph].ok ? '✔' : '✘'} ${ph}${p.task.phase === ph ? '  ◀' : ''}`);
+    for (const m of p.gates[ph].missing) lines.push(`    · ${m}`);
+  }
+  lines.push('', `Cola Asana (${p.queue.length}):`, ...p.queue.map((t) => `  - ${t.name}${t.url ? `  ${t.url}` : ''}`));
+  return lines.filter((l) => l !== null).join('\n');
+}
+
+refresh();
+connect();
+setInterval(refresh, 15000);
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# User unit: one supervisor pass. Install into ~/.config/systemd/user/ (see fleet/README.md).
+# Adjust the paths if agentic-os is not cloned at ~/agentic-os.
+[Unit]
+Description=agentic-os fleet: one supervisor pass over all repos
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.agentic-os/fleet.env
+# claude and node must be on PATH for the user service.
+Environment=PATH=%h/.local/bin:%h/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node %h/agentic-os/fleet/bin/fleet tick
+# A pass can hold several agent runs; each run has its own timeout (limits.runTimeoutMinutes).
+TimeoutStartSec=6h
