@@ -1,0 +1,8 @@
+$ npm run build
+
+> agentic-os-governance@0.1.0 build
+> node scripts/check.js
+
+✔ checked 27 JS + 3 JSON files, 0 failed
+
+[exit 0]

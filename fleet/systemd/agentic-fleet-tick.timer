@@ -1,0 +1,11 @@
+[Unit]
+Description=agentic-os fleet: run a supervisor pass every 10 minutes
+
+[Timer]
+OnBootSec=2min
+# Counted from the end of the previous pass, so passes never overlap.
+OnUnitInactiveSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

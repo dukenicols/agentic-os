@@ -1,0 +1,104 @@
+#!/usr/bin/env node
+'use strict';
+// fleet — run the governed workflow continuously across many repos. Run `fleet help`.
+
+const { loadRegistry, fleetHome } = require('../lib/registry');
+const { FleetState } = require('../lib/state');
+const { createAsana } = require('../lib/asana');
+const { tick } = require('../lib/tick');
+const { killAllAgents } = require('../lib/runner');
+const { createServer, snapshot } = require('../lib/server');
+
+const HELP = `fleet — agentic-os supervisor for many repos (config: $FLEET_HOME/fleet.json, default ~/.agentic-os)
+
+  fleet tick                        one pass: read gov status + Asana queue per repo, run agents where there is work
+  fleet serve [--host H] [--port P] read-only web UI (default 127.0.0.1:7420)
+  fleet status                      terminal summary and approval inbox
+  fleet pause <project> [reason]    stop scheduling runs for a project
+  fleet resume <project>            resume it (also clears the consecutive-failure counter)
+`;
+
+function flag(args, name, fallback) {
+  const i = args.indexOf(name);
+  return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
+}
+
+async function main(argv) {
+  const [cmd = 'help', ...rest] = argv;
+  if (cmd === 'help' || cmd === '--help' || cmd === '-h') return void process.stdout.write(HELP);
+
+  const home = fleetHome();
+  const registry = loadRegistry(home);
+  const state = new FleetState(home);
+
+  switch (cmd) {
+    case 'tick': {
+      const asana = createAsana();
+      // Agents run in their own process groups, so Ctrl-C / systemctl stop would not reach them: take them down with us.
+      for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+        process.once(sig, () => {
+          const n = killAllAgents('SIGTERM');
+          console.error(`fleet: ${sig} — stopping ${n} agent(s)`);
+          setTimeout(() => {
+            killAllAgents('SIGKILL');
+            process.exit(130);
+          }, n ? 3000 : 0);
+        });
+      }
+      const results = await tick({ registry, state, asana });
+      for (const r of results) {
+        console.log(r.skipped ? `- ${r.project}: skipped (${r.skipped})` : `${r.ok ? '✔' : '✘'} ${r.project}: exit ${r.exitCode}${r.timedOut ? ' (timeout)' : ''} in ${Math.round(r.durationMs / 1000)}s  [${r.runId}]`);
+      }
+      for (const p of registry.projects) {
+        const l = state.project(p.name).last;
+        if (l && !['start', 'continue'].includes(l.action)) console.log(`· ${p.name}: ${l.action}${l.gate ? ` ${l.gate}` : ''}${l.reason ? ` — ${l.reason}` : ''}`);
+      }
+      return;
+    }
+
+    case 'serve': {
+      const host = flag(rest, '--host', '127.0.0.1');
+      const port = Number(flag(rest, '--port', '7420'));
+      const server = createServer({ registry, state, host });
+      server.listen(port, host, () => console.log(`fleet UI (read-only) on http://${host}:${server.address().port}`));
+      return;
+    }
+
+    case 'status': {
+      const rows = await snapshot({ registry, state });
+      for (const p of rows) {
+        const what = p.error ? `error: ${p.error}` : p.task ? `${p.task.phase.padEnd(6)} ${p.task.title}` : 'no active task';
+        const flags = [p.paused && `PAUSED${p.pausedReason ? ` (${p.pausedReason})` : ''}`, p.awaiting && `AWAITING ${p.awaiting.toUpperCase()} APPROVAL`, `queue ${p.queue.length}`].filter(Boolean);
+        console.log(`${p.name.padEnd(20)} ${what}   [${flags.join(', ')}]`);
+      }
+      const inbox = rows.filter((p) => p.awaiting);
+      if (inbox.length) {
+        console.log('\nNeeds your approval (run in your own terminal):');
+        for (const p of inbox) console.log(`  cd ${p.path} && .governance/bin/gov approve ${p.awaiting}    # ${p.task.title}`);
+      }
+      return;
+    }
+
+    case 'pause':
+    case 'resume': {
+      const name = rest[0];
+      if (!registry.projects.some((p) => p.name === name)) throw new Error(`Unknown project: ${name || '(none)'}`);
+      const ps = state.update(name, (p) => {
+        p.paused = cmd === 'pause';
+        p.pausedReason = p.paused ? rest.slice(1).join(' ') || 'paused by human' : null;
+        if (!p.paused) p.consecutiveFailures = 0;
+      });
+      state.event(cmd, { project: name, reason: ps.pausedReason });
+      console.log(`${name}: ${cmd}d`);
+      return;
+    }
+
+    default:
+      throw new Error(`Unknown command: ${cmd}\n\n${HELP}`);
+  }
+}
+
+main(process.argv.slice(2)).catch((err) => {
+  console.error(`fleet: ${err.message}`);
+  process.exitCode = 2;
+});

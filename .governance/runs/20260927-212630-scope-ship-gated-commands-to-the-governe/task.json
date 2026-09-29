@@ -2,6 +2,7 @@
   "id": "20260927-212630-scope-ship-gated-commands-to-the-governe",
   "title": "Scope ship-gated commands to the governed repo",
   "phase": "ship",
-  "status": "active",
-  "createdAt": "2026-09-27T21:26:30.523Z"
+  "status": "shipped",
+  "createdAt": "2026-09-27T21:26:30.523Z",
+  "closedAt": "2026-09-27T22:41:29.667Z"
 }

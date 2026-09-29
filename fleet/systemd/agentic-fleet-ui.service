@@ -1,0 +1,12 @@
+[Unit]
+Description=agentic-os fleet: read-only web UI
+After=network-online.target
+
+[Service]
+# The UI needs no secrets: it never talks to Asana. Keep it on localhost and reach it over SSH/Tailscale.
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node %h/agentic-os/fleet/bin/fleet serve --host 127.0.0.1 --port 7420
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

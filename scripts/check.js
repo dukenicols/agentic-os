@@ -5,7 +5,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
-const js = ['.governance/bin/gov', ...['.governance/lib', '.governance/hooks', 'scripts', 'test'].flatMap((d) =>
+const js = ['.governance/bin/gov', 'fleet/bin/fleet', ...['.governance/lib', '.governance/hooks', 'fleet/lib', 'scripts', 'test'].flatMap((d) =>
   fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith('.js')).map((f) => `${d}/${f}`))];
 const json = ['.governance/config.json', 'package.json', ...['.claude/settings.json', '.claude/settings.json.off'].filter((f) => fs.existsSync(path.join(root, f)))];
 
